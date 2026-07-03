@@ -1,0 +1,18 @@
+services:
+  backend:
+    build:
+      context: ./backend
+    env_file:
+      - ./backend/.env.example
+    ports:
+      - "5000:5000"
+
+  frontend:
+    build:
+      context: ./frontend
+    environment:
+      VITE_API_BASE_URL: http://localhost:5000
+    ports:
+      - "5173:80"
+    depends_on:
+      - backend
