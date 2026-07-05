@@ -4,6 +4,7 @@ from app.config import get_config
 from app.errors import register_error_handlers
 from app.extensions import cors, db
 from app.logging import configure_logging
+from app.routes.auth import auth_bp
 from app.routes.health import health_bp
 
 
@@ -27,3 +28,4 @@ def register_extensions(app: Flask) -> None:
 
 def register_blueprints(app: Flask) -> None:
     app.register_blueprint(health_bp)
+    app.register_blueprint(auth_bp)

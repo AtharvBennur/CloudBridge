@@ -18,7 +18,7 @@ interface LocationState {
 }
 
 export function LoginPage() {
-  const { isAuthenticated, login } = useAuth();
+  const { isAuthenticated, isLoading, login } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const locationState = location.state as LocationState | null;
@@ -27,6 +27,10 @@ export function LoginPage() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  if (isLoading) {
+    return <div className="flex min-h-screen items-center justify-center">Preparing authentication…</div>;
+  }
 
   if (isAuthenticated) {
     return <Navigate to="/dashboard" replace />;
