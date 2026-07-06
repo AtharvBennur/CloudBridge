@@ -4,6 +4,10 @@ import { AppShell } from "@/components/layout/AppShell";
 import { ProtectedRoute } from "@/components/routing/ProtectedRoute";
 import { DashboardPage } from "@/pages/DashboardPage";
 import { LoginPage } from "@/pages/LoginPage";
+import { MigrationCreatePage } from "@/pages/MigrationCreatePage";
+import { MigrationDetailPage } from "@/pages/MigrationDetailPage";
+import { MigrationEditPage } from "@/pages/MigrationEditPage";
+import { MigrationListPage } from "@/pages/MigrationListPage";
 import { NotFoundPage } from "@/pages/NotFoundPage";
 
 export function App() {
@@ -18,6 +22,46 @@ export function App() {
             <ProtectedRoute>
               <AppShell>
                 <DashboardPage />
+              </AppShell>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/migrations"
+          element={
+            <ProtectedRoute>
+              <AppShell>
+                <MigrationListPage />
+              </AppShell>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/migrations/new"
+          element={
+            <ProtectedRoute>
+              <AppShell>
+                <MigrationCreatePage />
+              </AppShell>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/migrations/:id"
+          element={
+            <ProtectedRoute>
+              <AppShell>
+                <MigrationDetailPage />
+              </AppShell>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/migrations/:id/edit"
+          element={
+            <ProtectedRoute>
+              <AppShell>
+                <MigrationEditPage />
               </AppShell>
             </ProtectedRoute>
           }

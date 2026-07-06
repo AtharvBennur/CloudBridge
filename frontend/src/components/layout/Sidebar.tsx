@@ -1,10 +1,11 @@
-import { Activity, LayoutDashboard, ShieldCheck } from "lucide-react";
+import { Activity, Database, LayoutDashboard, ShieldCheck } from "lucide-react";
 import { NavLink } from "react-router-dom";
 
 import { cn } from "@/lib/utils";
 
 const navigationItems = [
   { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
+  { label: "Migrations", href: "/migrations", icon: Database },
   { label: "Health", href: "/dashboard", icon: Activity },
   { label: "Auth", href: "/dashboard", icon: ShieldCheck },
 ];
@@ -18,7 +19,7 @@ export function Sidebar() {
         </div>
         <div>
           <p className="text-sm font-semibold">CloudBridge</p>
-          <p className="text-xs text-muted-foreground">Sprint 1 Foundation</p>
+          <p className="text-xs text-muted-foreground">Sprint 3 Workspace</p>
         </div>
       </div>
 

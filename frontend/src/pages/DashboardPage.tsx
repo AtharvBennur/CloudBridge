@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { motion } from "framer-motion";
-import { Activity, CheckCircle2, Database, KeyRound, Server, ShieldCheck } from "lucide-react";
+import { Activity, CheckCircle2, Database, KeyRound, Server, ShieldCheck, Workflow } from "lucide-react";
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { env } from "@/lib/env";
@@ -10,7 +10,7 @@ const readinessItems = [
   { label: "Application shell", status: "Ready" },
   { label: "Protected routing", status: "Ready" },
   { label: "Theme system", status: "Ready" },
-  { label: "API client", status: "Ready" },
+  { label: "Migration CRUD", status: "Ready" },
 ];
 
 export function DashboardPage() {
@@ -33,11 +33,11 @@ export function DashboardPage() {
         <div className="rounded-lg border bg-card p-6 shadow-soft">
           <p className="mb-3 text-sm font-semibold uppercase text-primary">CloudBridge Console</p>
           <h1 className="text-3xl font-semibold leading-tight md:text-4xl">
-            Sprint 1 foundation is ready for product work.
+            Sprint 3 migration workflows are now live in the console.
           </h1>
           <p className="mt-3 max-w-2xl text-muted-foreground">
-            The dashboard verifies frontend routing, auth boundaries, theme behavior, and backend
-            health without introducing migration workflows or AWS orchestration.
+            The dashboard now reflects authentication, backend health, and the new migration-job
+            lifecycle managed through the Flask backend.
           </p>
         </div>
 
@@ -108,12 +108,12 @@ export function DashboardPage() {
 
         <Card>
           <CardHeader>
-            <Database className="mb-2 h-5 w-5 text-primary" />
-            <CardTitle>Data Layer</CardTitle>
-            <CardDescription>Persistence primitives exist without product workflows.</CardDescription>
+            <Workflow className="mb-2 h-5 w-5 text-primary" />
+            <CardTitle>Migration Workflows</CardTitle>
+            <CardDescription>Management screens now match the backend CRUD contract.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-3 text-sm text-muted-foreground">
-            <p>No migration feature pages or AWS orchestration are present.</p>
+            <p>Create, view, edit, and delete migration jobs from the console.</p>
             <p>Configuration is environment-driven with no hardcoded secrets.</p>
           </CardContent>
         </Card>
