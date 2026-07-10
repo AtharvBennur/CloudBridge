@@ -23,7 +23,14 @@ class BaseConfig:
     PORT = int(os.getenv("PORT", "5000"))
     DEBUG = False
     TESTING = False
-    CORS_ORIGINS = [origin.strip() for origin in os.getenv("CORS_ORIGINS", "http://localhost:5173,http://localhost:5174").split(",")]
+    CORS_ORIGINS = [
+        origin.strip()
+        for origin in os.getenv(
+            "CORS_ORIGINS",
+            "http://localhost:5173,http://localhost:5174,http://127.0.0.1:5173,http://127.0.0.1:5174",
+        ).split(",")
+        if origin.strip()
+    ]
     LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO")
 
     COGNITO_REGION = os.getenv("COGNITO_REGION", "")

@@ -2,6 +2,7 @@ import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 
 import { AppShell } from "@/components/layout/AppShell";
 import { ProtectedRoute } from "@/components/routing/ProtectedRoute";
+import { AWSConnectionPage } from "@/pages/AWSConnectionPage";
 import { DashboardPage } from "@/pages/DashboardPage";
 import { LoginPage } from "@/pages/LoginPage";
 import { MigrationCreatePage } from "@/pages/MigrationCreatePage";
@@ -62,6 +63,16 @@ export function App() {
             <ProtectedRoute>
               <AppShell>
                 <MigrationEditPage />
+              </AppShell>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/aws-connections"
+          element={
+            <ProtectedRoute>
+              <AppShell>
+                <AWSConnectionPage />
               </AppShell>
             </ProtectedRoute>
           }

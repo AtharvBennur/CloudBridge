@@ -1,11 +1,11 @@
-import { LogOut, Menu, Search } from "lucide-react";
+import { Bell, LogOut, Menu, Search } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
 import { ThemeToggle } from "@/components/theme/ThemeToggle";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/context/AuthContext";
 
-export function TopNavbar() {
+export function TopNavbar({ isCollapsed, onToggle }: { isCollapsed: boolean; onToggle: (value: boolean) => void }) {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
 
@@ -15,19 +15,25 @@ export function TopNavbar() {
   };
 
   return (
-    <header className="sticky top-0 z-20 border-b bg-background/88 px-4 py-3 backdrop-blur md:px-6">
+    <header className="sticky top-0 z-20 border-b border-border/70 bg-background/80 px-4 py-3 backdrop-blur md:px-6">
       <div className="flex items-center justify-between gap-4">
         <div className="flex min-w-0 items-center gap-3">
           <Button variant="ghost" size="icon" className="lg:hidden" aria-label="Open navigation">
             <Menu className="h-5 w-5" />
           </Button>
-          <div className="hidden h-10 w-[min(36vw,420px)] items-center gap-2 rounded-md border bg-card px-3 text-sm text-muted-foreground md:flex">
+          <Button variant="ghost" size="icon" className="hidden lg:inline-flex" onClick={() => onToggle(!isCollapsed)} aria-label="Collapse sidebar">
+            <Menu className="h-5 w-5" />
+          </Button>
+          <div className="hidden h-11 w-[min(36vw,420px)] items-center gap-2 rounded-2xl border border-border/70 bg-card/80 px-3 text-sm text-muted-foreground md:flex">
             <Search className="h-4 w-4" />
-            <span>Search foundation assets</span>
+            <span>Search migrations, accounts, and health</span>
           </div>
         </div>
 
         <div className="flex items-center gap-2">
+          <Button variant="ghost" size="icon" aria-label="Notifications">
+            <Bell className="h-4 w-4" />
+          </Button>
           <ThemeToggle />
           <div className="hidden text-right sm:block">
             <p className="text-sm font-medium">{user?.displayName}</p>

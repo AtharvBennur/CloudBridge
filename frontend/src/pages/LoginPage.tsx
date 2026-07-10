@@ -1,6 +1,6 @@
 import { FormEvent, useState } from "react";
 import { motion } from "framer-motion";
-import { ArrowRight, Cloud, LockKeyhole } from "lucide-react";
+import { ArrowRight, CheckCircle2, Cloud, LockKeyhole, ShieldCheck, Sparkles } from "lucide-react";
 import { Navigate, useLocation, useNavigate } from "react-router-dom";
 
 import { ThemeToggle } from "@/components/theme/ThemeToggle";

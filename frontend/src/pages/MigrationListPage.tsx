@@ -14,7 +14,7 @@ Migration Service
 */
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Plus, Trash2, PencilLine, Eye } from "lucide-react";
+import { ArrowRight, Plus, Trash2, PencilLine, Eye, DatabaseZap } from "lucide-react";
 import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
@@ -65,34 +65,39 @@ export function MigrationListPage() {
 
   return (
     <div className="mx-auto max-w-7xl space-y-6">
-      <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-        <div>
-          <h1 className="text-3xl font-semibold">Migration jobs</h1>
-          <p className="mt-2 text-sm text-muted-foreground">
-            Review and manage metadata for every migration workflow in the platform.
-          </p>
+      <div className="flex flex-col gap-4 rounded-3xl border border-border/70 bg-card/80 p-6 shadow-sm md:flex-row md:items-center md:justify-between">
+        <div className="flex items-start gap-3">
+          <div className="rounded-2xl bg-primary/10 p-3 text-primary">
+            <DatabaseZap className="h-5 w-5" />
+          </div>
+          <div>
+            <h1 className="text-3xl font-semibold">Migration jobs</h1>
+            <p className="mt-2 text-sm text-muted-foreground">
+              Review and manage metadata for every workflow in your migration catalog.
+            </p>
+          </div>
         </div>
 
-        <Button onClick={() => navigate("/migrations/new")}> 
+        <Button onClick={() => navigate("/migrations/new")}>
           <Plus className="h-4 w-4" />
           New migration
         </Button>
       </div>
 
-      <Card>
+      <Card className="border-border/70 shadow-sm">
         <CardHeader>
           <CardTitle>All migrations</CardTitle>
           <CardDescription>List of jobs created through the backend CRUD API.</CardDescription>
         </CardHeader>
         <CardContent>
           {migrationsQuery.isLoading ? (
-            <div className="rounded-lg border border-dashed p-8 text-sm text-muted-foreground">
+            <div className="rounded-2xl border border-dashed p-8 text-sm text-muted-foreground">
               Loading migration jobs…
             </div>
           ) : null}
 
           {migrationsQuery.isError ? (
-            <div className="rounded-lg border border-destructive/40 bg-destructive/10 p-4 text-sm text-destructive">
+            <div className="rounded-2xl border border-destructive/40 bg-destructive/10 p-4 text-sm text-destructive">
               {migrationsQuery.error instanceof Error
                 ? migrationsQuery.error.message
                 : "Unable to load migration jobs."}
@@ -100,15 +105,15 @@ export function MigrationListPage() {
           ) : null}
 
           {!migrationsQuery.isLoading && !migrationsQuery.isError && sortedMigrations.length === 0 ? (
-            <div className="rounded-lg border border-dashed p-8 text-center text-sm text-muted-foreground">
+            <div className="rounded-2xl border border-dashed p-8 text-center text-sm text-muted-foreground">
               No migration jobs yet. Create the first one to get started.
             </div>
           ) : null}
 
           {!migrationsQuery.isLoading && !migrationsQuery.isError && sortedMigrations.length > 0 ? (
-            <div className="overflow-hidden rounded-lg border">
+            <div className="overflow-hidden rounded-2xl border border-border/70">
               <table className="min-w-full divide-y divide-border text-sm">
-                <thead className="bg-muted/60 text-left">
+                <thead className="bg-muted/70 text-left">
                   <tr>
                     <th className="px-4 py-3 font-medium">Job name</th>
                     <th className="px-4 py-3 font-medium">Source</th>
@@ -118,7 +123,7 @@ export function MigrationListPage() {
                     <th className="px-4 py-3 font-medium">Actions</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-border bg-background">
+                <tbody className="divide-y divide-border bg-background/80">
                   {sortedMigrations.map((migration) => (
                     <tr key={migration.id} className="align-middle">
                       <td className="px-4 py-3 font-medium">{migration.job_name}</td>
@@ -129,7 +134,7 @@ export function MigrationListPage() {
                       </td>
                       <td className="px-4 py-3 text-muted-foreground">{formatDate(migration.created_at)}</td>
                       <td className="px-4 py-3">
-                        <div className="flex items-center gap-2">
+                        <div className="flex flex-wrap items-center gap-2">
                           <Button variant="ghost" size="sm" onClick={() => navigate(`/migrations/${migration.id}`)}>
                             <Eye className="mr-2 h-4 w-4" />
                             View
@@ -138,11 +143,7 @@ export function MigrationListPage() {
                             <PencilLine className="mr-2 h-4 w-4" />
                             Edit
                           </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => setSelectedMigrationId(migration.id)}
-                          >
+                          <Button variant="ghost" size="sm" onClick={() => setSelectedMigrationId(migration.id)}>
                             <Trash2 className="mr-2 h-4 w-4" />
                             Delete
                           </Button>

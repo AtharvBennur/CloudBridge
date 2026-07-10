@@ -4,8 +4,10 @@ from app.config import get_config
 from app.errors import register_error_handlers
 from app.extensions import cors, db
 from app.logging import configure_logging
+from app.models.aws_connection import AWSConnection
 from app.models.migration import MigrationJob
 from app.routes.auth import auth_bp
+from app.routes.aws_connection import aws_connection_bp
 from app.routes.health import health_bp
 from app.routes.migration import migration_bp
 
@@ -35,3 +37,4 @@ def register_blueprints(app: Flask) -> None:
     app.register_blueprint(health_bp)
     app.register_blueprint(auth_bp)
     app.register_blueprint(migration_bp)
+    app.register_blueprint(aws_connection_bp)
