@@ -15,12 +15,19 @@ AWS Connection Model
 
 from flask import Blueprint, jsonify, request
 
-from app.exceptions.aws_connection import AWSConnectionError, AWSConnectionNotFoundError, AWSConnectionValidationError
+from app.exceptions.aws_connection import (
+    AWSConnectionError,
+    AWSConnectionIntegrationError,
+    AWSConnectionNotFoundError,
+    AWSConnectionValidationError,
+)
 from app.services.aws_connection_service import AWSConnectionService
+from app.services.cloudformation_service import CloudFormationService
 
 
 aws_connection_bp = Blueprint("aws_connection", __name__, url_prefix="/aws-connections")
 aws_connection_service = AWSConnectionService()
+cloudformation_service = CloudFormationService()
 
 
 @aws_connection_bp.errorhandler(AWSConnectionValidationError)
@@ -38,7 +45,8 @@ def handle_not_found_error(error: AWSConnectionNotFoundError):
 @aws_connection_bp.errorhandler(AWSConnectionError)
 def handle_aws_connection_error(error: AWSConnectionError):
     """Return a generic response for AWS connection service failures."""
-    return jsonify({"error": {"message": error.message}}), 400
+    status_code = 502 if isinstance(error, AWSConnectionIntegrationError) else 400
+    return jsonify({"error": {"message": error.message}}), status_code
 
 
 @aws_connection_bp.post("")
@@ -80,20 +88,52 @@ def delete_aws_connection(aws_connection_id: int):
 
 @aws_connection_bp.post("/connect")
 def connect_aws_connection():
-    """Placeholder endpoint for future STS connection integration."""
-    response = aws_connection_service.connect()
+    """Establish STS connection to customer AWS account."""
+    payload = request.get_json(silent=True)
+    response = aws_connection_service.connect(payload)
+    return jsonify(response), 200
+
+
+@aws_connection_bp.post("/<int:aws_connection_id>/connect")
+def connect_aws_connection_by_id(aws_connection_id: int):
+    """Establish STS connection to customer AWS account by connection ID."""
+    response = aws_connection_service.connect(aws_connection_id=aws_connection_id)
     return jsonify(response), 200
 
 
 @aws_connection_bp.post("/validate")
 def validate_aws_connection():
-    """Placeholder endpoint for future STS validation integration."""
-    response = aws_connection_service.validate()
+    """Validate AWS connection including IAM permissions."""
+    payload = request.get_json(silent=True)
+    response = aws_connection_service.validate(payload)
+    return jsonify(response), 200
+
+
+@aws_connection_bp.post("/<int:aws_connection_id>/validate")
+def validate_aws_connection_by_id(aws_connection_id: int):
+    """Validate AWS connection by connection ID."""
+    response = aws_connection_service.validate(aws_connection_id=aws_connection_id)
     return jsonify(response), 200
 
 
 @aws_connection_bp.post("/disconnect")
 def disconnect_aws_connection():
-    """Placeholder endpoint for future STS disconnection integration."""
-    response = aws_connection_service.disconnect()
+    """Disconnect an AWS connection."""
+    payload = request.get_json(silent=True)
+    response = aws_connection_service.disconnect(payload)
+    return jsonify(response), 200
+
+
+@aws_connection_bp.post("/<int:aws_connection_id>/disconnect")
+def disconnect_aws_connection_by_id(aws_connection_id: int):
+    """Disconnect an AWS connection by connection ID."""
+    response = aws_connection_service.disconnect(aws_connection_id=aws_connection_id)
+    return jsonify(response), 200
+
+
+@aws_connection_bp.get("/<int:aws_connection_id>/cloudformation-template")
+def get_cloudformation_template(aws_connection_id: int):
+    """Generate a downloadable CloudFormation template for customer IAM setup."""
+    include_ecs = request.args.get("include_ecs_task_role", "true").lower() == "true"
+    response = cloudformation_service.generate_template(aws_connection_id, include_ecs_task_role=include_ecs)
     return jsonify(response), 200

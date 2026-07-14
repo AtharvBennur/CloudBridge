@@ -72,4 +72,34 @@ export const migrationService = {
     const response = await apiClient.delete<DeleteMigrationResponse>(`/migrations/${id}`);
     return response.data;
   },
+
+  async start(migrationId: number): Promise<any> {
+    const response = await apiClient.post<any>("/migration-engine/start", { migration_id: migrationId });
+    return response.data;
+  },
+
+  async pause(migrationId: number): Promise<any> {
+    const response = await apiClient.post<any>("/migration-engine/pause", { migration_id: migrationId });
+    return response.data;
+  },
+
+  async resume(migrationId: number): Promise<any> {
+    const response = await apiClient.post<any>("/migration-engine/resume", { migration_id: migrationId });
+    return response.data;
+  },
+
+  async cancel(migrationId: number): Promise<any> {
+    const response = await apiClient.post<any>("/migration-engine/cancel", { migration_id: migrationId });
+    return response.data;
+  },
+
+  async retry(migrationId: number): Promise<any> {
+    const response = await apiClient.post<any>("/migration-engine/retry", { migration_id: migrationId });
+    return response.data;
+  },
+
+  async getStatus(migrationId: number): Promise<any> {
+    const response = await apiClient.get<any>(`/migration-engine/${migrationId}/status`);
+    return response.data;
+  },
 };

@@ -70,4 +70,24 @@ export const awsConnectionService = {
     const response = await apiClient.delete<DeleteAWSConnectionResponse>(`/aws-connections/${id}`);
     return response.data;
   },
+
+  async connect(id: number): Promise<any> {
+    const response = await apiClient.post<any>(`/aws-connections/${id}/connect`);
+    return response.data;
+  },
+
+  async validate(id: number): Promise<any> {
+    const response = await apiClient.post<any>(`/aws-connections/${id}/validate`);
+    return response.data;
+  },
+
+  async disconnect(id: number): Promise<any> {
+    const response = await apiClient.post<any>(`/aws-connections/${id}/disconnect`);
+    return response.data;
+  },
+
+  async getCloudformationTemplate(id: number): Promise<any> {
+    const response = await apiClient.get<any>(`/aws-connections/${id}/cloudformation-template`);
+    return response.data;
+  },
 };

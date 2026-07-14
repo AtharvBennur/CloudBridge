@@ -28,11 +28,14 @@ class MigrationStatus:
     """Centralizes the supported migration job statuses."""
 
     PENDING = "PENDING"
+    QUEUED = "QUEUED"
     RUNNING = "RUNNING"
+    PAUSED = "PAUSED"
     COMPLETED = "COMPLETED"
     FAILED = "FAILED"
+    CANCELLED = "CANCELLED"
 
-    VALUES = {PENDING, RUNNING, COMPLETED, FAILED}
+    VALUES = {PENDING, QUEUED, RUNNING, PAUSED, COMPLETED, FAILED, CANCELLED}
 
 
 class MigrationJob(db.Model):
@@ -46,6 +49,19 @@ class MigrationJob(db.Model):
     destination_database = db.Column(db.String(255), nullable=False)
     status = db.Column(db.String(20), nullable=False, default=MigrationStatus.PENDING)
     description = db.Column(db.Text, nullable=True)
+    aws_connection_id = db.Column(db.Integer, db.ForeignKey("aws_connections.id"), nullable=True, index=True)
+    source_database_config_id = db.Column(db.Integer, db.ForeignKey("database_configs.id"), nullable=True)
+    destination_database_config_id = db.Column(db.Integer, db.ForeignKey("database_configs.id"), nullable=True)
+    progress_percent = db.Column(db.Float, nullable=False, default=0.0)
+    rows_migrated = db.Column(db.Integer, nullable=False, default=0)
+    total_rows = db.Column(db.Integer, nullable=True)
+    current_table = db.Column(db.String(255), nullable=True)
+    retry_count = db.Column(db.Integer, nullable=False, default=0)
+    max_retries = db.Column(db.Integer, nullable=False, default=3)
+    chunk_size = db.Column(db.Integer, nullable=False, default=1000)
+    error_message = db.Column(db.Text, nullable=True)
+    started_at = db.Column(db.DateTime, nullable=True)
+    completed_at = db.Column(db.DateTime, nullable=True)
     created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow, server_default=text("CURRENT_TIMESTAMP"))
     updated_at = db.Column(
         db.DateTime,

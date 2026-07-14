@@ -3,6 +3,7 @@ import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import { AppShell } from "@/components/layout/AppShell";
 import { ProtectedRoute } from "@/components/routing/ProtectedRoute";
 import { AWSConnectionPage } from "@/pages/AWSConnectionPage";
+import { DatabaseConfigPage } from "@/pages/DatabaseConfigPage";
 import { DashboardPage } from "@/pages/DashboardPage";
 import { LoginPage } from "@/pages/LoginPage";
 import { MigrationCreatePage } from "@/pages/MigrationCreatePage";
@@ -10,6 +11,7 @@ import { MigrationDetailPage } from "@/pages/MigrationDetailPage";
 import { MigrationEditPage } from "@/pages/MigrationEditPage";
 import { MigrationListPage } from "@/pages/MigrationListPage";
 import { NotFoundPage } from "@/pages/NotFoundPage";
+import { PreflightPage } from "@/pages/PreflightPage";
 
 export function App() {
   return (
@@ -68,6 +70,16 @@ export function App() {
           }
         />
         <Route
+          path="/database-configs"
+          element={
+            <ProtectedRoute>
+              <AppShell>
+                <DatabaseConfigPage />
+              </AppShell>
+            </ProtectedRoute>
+          }
+        />
+        <Route
           path="/aws-connections"
           element={
             <ProtectedRoute>
@@ -77,6 +89,7 @@ export function App() {
             </ProtectedRoute>
           }
         />
+        <Route path="/preflight" element={<ProtectedRoute><AppShell><PreflightPage /></AppShell></ProtectedRoute>} />
         <Route path="*" element={<NotFoundPage />} />
       </Routes>
     </BrowserRouter>

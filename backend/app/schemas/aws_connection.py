@@ -74,6 +74,22 @@ class AWSConnectionValidation:
 
 
 @dataclass(frozen=True)
+class ConnectAWSConnectionRequest:
+    """Represents the payload for connect/validate/disconnect operations."""
+
+    aws_connection_id: int
+
+    @classmethod
+    def from_payload(cls, payload: dict[str, Any] | None) -> "ConnectAWSConnectionRequest":
+        if not isinstance(payload, dict):
+            raise ValueError("Request body must be a JSON object.")
+        aws_connection_id = payload.get("aws_connection_id")
+        if not isinstance(aws_connection_id, int) or aws_connection_id < 1:
+            raise ValueError("aws_connection_id must be a positive integer.")
+        return cls(aws_connection_id=aws_connection_id)
+
+
+@dataclass(frozen=True)
 class CreateAWSConnectionRequest:
     """Represents the payload required to create a new AWS connection."""
 

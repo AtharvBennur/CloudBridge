@@ -1,16 +1,17 @@
 """
 Purpose:
-This file contains the AWS connection business logic.
+This file contains the AWS connection business logic with real STS integration.
 
 Why:
-Routes should remain thin, while the service layer owns validation, persistence, and response shaping.
+Routes should remain thin, while the service layer owns validation, persistence,
+cross-account STS AssumeRole, and connection testing.
 
 Architecture:
 AWS Connection Routes
 ↓
 AWS Connection Service
 ↓
-SQLAlchemy Model
+AWS Client / SQLAlchemy Model
 """
 
 from __future__ import annotations
@@ -19,23 +20,31 @@ from datetime import datetime
 from typing import Any
 from uuid import uuid4
 
+from botocore.exceptions import ClientError
 from flask import current_app
 
-from app.exceptions.aws_connection import AWSConnectionNotFoundError, AWSConnectionValidationError
+from app.exceptions.aws_connection import (
+    AWSConnectionIntegrationError,
+    AWSConnectionNotFoundError,
+    AWSConnectionValidationError,
+)
 from app.extensions import db
 from app.models.aws_connection import AWSConnection, AWSConnectionStatus
 from app.schemas.aws_connection import (
     AWSConnectionResponse,
+    ConnectAWSConnectionRequest,
     CreateAWSConnectionRequest,
     DeleteAWSConnectionResponse,
     UpdateAWSConnectionRequest,
 )
+from app.utils.aws_client import AWSClient
 
 
 class AWSConnectionService:
-    """Coordinates AWS connection CRUD behavior for the current sprint."""
+    """Coordinates AWS connection CRUD and real STS integration."""
 
-    def __init__(self, logger: Any | None = None) -> None:
+    def __init__(self, aws_client: AWSClient | None = None, logger: Any | None = None) -> None:
+        self._aws_client = aws_client or AWSClient(logger=logger)
         self._logger = logger
 
     def create(self, payload: dict[str, Any] | None) -> AWSConnectionResponse:
@@ -102,29 +111,98 @@ class AWSConnectionService:
         self._log_info("AWS connection deleted", aws_connection.id, aws_connection.aws_account_id)
         return DeleteAWSConnectionResponse(message="AWS connection deleted successfully.")
 
-    def connect(self) -> dict[str, Any]:
-        """Return a placeholder response for future AWS STS integration."""
+    def connect(self, payload: dict[str, Any] | None = None, aws_connection_id: int | None = None) -> dict[str, Any]:
+        """
+        Establish a real STS connection to the customer's AWS account.
+
+        Performs AssumeRole with external ID validation, account verification,
+        and region access testing. Persists connection status on success.
+        """
+        connection_id = self._resolve_connection_id(payload, aws_connection_id)
+        connection = self._get_existing_connection(connection_id)
+
+        try:
+            result = self._aws_client.test_connection(
+                role_arn=connection.role_arn,
+                external_id=connection.external_id,
+                expected_account_id=connection.aws_account_id,
+                region=connection.aws_region,
+            )
+        except (ClientError, ValueError) as exc:
+            connection.connection_status = AWSConnectionStatus.PENDING
+            connection.updated_at = datetime.utcnow()
+            db.session.commit()
+            self._log_info("Connection test failed for AWS connection %s: %s", connection_id, exc)
+            raise AWSConnectionIntegrationError(f"Connection test failed: {exc}") from exc
+
+        connection.connection_status = AWSConnectionStatus.CONNECTED
+        connection.updated_at = datetime.utcnow()
+        db.session.commit()
+
+        self._log_info("Connection test passed for AWS connection %s", connection_id)
         return {
-            "status": "PENDING",
-            "message": "AWS integration will be implemented in Sprint 5.",
+            "status": AWSConnectionStatus.CONNECTED,
+            "message": "Successfully connected to customer AWS account.",
             "step": "connect",
+            "aws_connection_id": connection_id,
+            "details": result,
         }
 
-    def validate(self) -> dict[str, Any]:
-        """Return a placeholder response for future AWS validation integration."""
+    def validate(self, payload: dict[str, Any] | None = None, aws_connection_id: int | None = None) -> dict[str, Any]:
+        """Validate an existing AWS connection including IAM permissions."""
+        connection_id = self._resolve_connection_id(payload, aws_connection_id)
+        connection = self._get_existing_connection(connection_id)
+
+        try:
+            credentials = self._aws_client.assume_role(
+                connection.role_arn,
+                connection.external_id,
+                region=connection.aws_region,
+            )
+            self._aws_client.verify_account_id(credentials, connection.aws_account_id, connection.aws_region)
+            self._aws_client.validate_region_access(credentials, connection.aws_region)
+            permissions = self._aws_client.validate_iam_permissions(credentials, connection.aws_region)
+        except (ClientError, ValueError) as exc:
+            raise AWSConnectionIntegrationError(f"Validation failed: {exc}") from exc
+
+        missing = [k for k, v in permissions.items() if not v]
+        valid = len(missing) == 0
+
         return {
-            "status": "PENDING",
-            "message": "AWS integration will be implemented in Sprint 5.",
+            "status": "VALID" if valid else "PARTIAL",
+            "message": "All permissions validated." if valid else f"Missing permissions: {', '.join(missing)}",
             "step": "validate",
+            "aws_connection_id": connection_id,
+            "permissions": permissions,
         }
 
-    def disconnect(self) -> dict[str, Any]:
-        """Return a placeholder response for future AWS disconnect integration."""
+    def disconnect(self, payload: dict[str, Any] | None = None, aws_connection_id: int | None = None) -> dict[str, Any]:
+        """Mark an AWS connection as disconnected."""
+        connection_id = self._resolve_connection_id(payload, aws_connection_id)
+        connection = self._get_existing_connection(connection_id)
+
+        connection.connection_status = AWSConnectionStatus.DISCONNECTED
+        connection.updated_at = datetime.utcnow()
+        db.session.commit()
+
+        self._log_info("AWS connection disconnected", connection_id)
         return {
-            "status": "PENDING",
-            "message": "AWS integration will be implemented in Sprint 5.",
+            "status": AWSConnectionStatus.DISCONNECTED,
+            "message": "AWS connection has been disconnected.",
             "step": "disconnect",
+            "aws_connection_id": connection_id,
         }
+
+    def _resolve_connection_id(self, payload: dict[str, Any] | None, aws_connection_id: int | None) -> int:
+        if aws_connection_id is not None:
+            return aws_connection_id
+        if payload:
+            try:
+                request = ConnectAWSConnectionRequest.from_payload(payload)
+                return request.aws_connection_id
+            except ValueError as exc:
+                raise AWSConnectionValidationError(str(exc)) from exc
+        raise AWSConnectionValidationError("aws_connection_id is required.")
 
     def _get_existing_connection(self, aws_connection_id: int) -> AWSConnection:
         """Return an existing AWS connection or raise a not-found error."""
@@ -138,5 +216,8 @@ class AWSConnectionService:
         logger = self._logger or current_app.logger
         if aws_connection_id is not None and aws_account_id is not None:
             logger.info("%s for AWS connection %s (%s)", message, aws_connection_id, aws_account_id)
+            return
+        if aws_connection_id is not None:
+            logger.info(message, aws_connection_id)
             return
         logger.info(message)

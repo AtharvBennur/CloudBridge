@@ -29,6 +29,9 @@ class CreateMigrationRequest:
     source_database: str
     destination_database: str
     description: str | None = None
+    aws_connection_id: int | None = None
+    source_database_config_id: int | None = None
+    destination_database_config_id: int | None = None
 
     @classmethod
     def from_payload(cls, payload: dict[str, Any] | None) -> "CreateMigrationRequest":
@@ -40,6 +43,9 @@ class CreateMigrationRequest:
         source_database = payload.get("source_database")
         destination_database = payload.get("destination_database")
         description = payload.get("description")
+        aws_connection_id = payload.get("aws_connection_id")
+        source_database_config_id = payload.get("source_database_config_id")
+        destination_database_config_id = payload.get("destination_database_config_id")
 
         if not isinstance(job_name, str) or not job_name.strip():
             raise ValueError("Job name is required.")
@@ -53,11 +59,24 @@ class CreateMigrationRequest:
         if description is not None and not isinstance(description, str):
             raise ValueError("Description must be a string.")
 
+        try:
+            if aws_connection_id is not None:
+                aws_connection_id = int(aws_connection_id)
+            if source_database_config_id is not None:
+                source_database_config_id = int(source_database_config_id)
+            if destination_database_config_id is not None:
+                destination_database_config_id = int(destination_database_config_id)
+        except (TypeError, ValueError) as exc:
+            raise ValueError("Connection and database config IDs must be integers.") from exc
+
         return cls(
             job_name=job_name.strip(),
             source_database=source_database.strip(),
             destination_database=destination_database.strip(),
             description=description.strip() if isinstance(description, str) else None,
+            aws_connection_id=aws_connection_id,
+            source_database_config_id=source_database_config_id,
+            destination_database_config_id=destination_database_config_id,
         )
 
 
@@ -70,6 +89,9 @@ class UpdateMigrationRequest:
     destination_database: str | None = None
     status: str | None = None
     description: str | None = None
+    aws_connection_id: int | None = None
+    source_database_config_id: int | None = None
+    destination_database_config_id: int | None = None
 
     @classmethod
     def from_payload(cls, payload: dict[str, Any] | None) -> "UpdateMigrationRequest":
@@ -85,6 +107,9 @@ class UpdateMigrationRequest:
         destination_database = payload.get("destination_database")
         status = payload.get("status")
         description = payload.get("description")
+        aws_connection_id = payload.get("aws_connection_id")
+        source_database_config_id = payload.get("source_database_config_id")
+        destination_database_config_id = payload.get("destination_database_config_id")
 
         if job_name is not None and (not isinstance(job_name, str) or not job_name.strip()):
             raise ValueError("Job name must be a non-empty string.")
@@ -100,11 +125,23 @@ class UpdateMigrationRequest:
                 raise ValueError("Status must be a non-empty string.")
             normalized_status = status.strip().upper()
             if normalized_status not in MigrationStatus.VALUES:
-                raise ValueError("Status must be one of: PENDING, RUNNING, COMPLETED, FAILED.")
+                raise ValueError(
+                    "Status must be one of: PENDING, QUEUED, RUNNING, PAUSED, COMPLETED, FAILED, CANCELLED."
+                )
             status = normalized_status
 
         if description is not None and not isinstance(description, str):
             raise ValueError("Description must be a string.")
+
+        try:
+            if aws_connection_id is not None:
+                aws_connection_id = int(aws_connection_id)
+            if source_database_config_id is not None:
+                source_database_config_id = int(source_database_config_id)
+            if destination_database_config_id is not None:
+                destination_database_config_id = int(destination_database_config_id)
+        except (TypeError, ValueError) as exc:
+            raise ValueError("Connection and database config IDs must be integers.") from exc
 
         return cls(
             job_name=job_name.strip() if isinstance(job_name, str) else None,
@@ -112,6 +149,9 @@ class UpdateMigrationRequest:
             destination_database=destination_database.strip() if isinstance(destination_database, str) else None,
             status=status,
             description=description.strip() if isinstance(description, str) else None,
+            aws_connection_id=aws_connection_id,
+            source_database_config_id=source_database_config_id,
+            destination_database_config_id=destination_database_config_id,
         )
 
 
@@ -125,6 +165,9 @@ class MigrationResponse:
     destination_database: str
     status: str
     description: str | None
+    aws_connection_id: int | None
+    source_database_config_id: int | None
+    destination_database_config_id: int | None
     created_at: str
     updated_at: str
 
@@ -137,6 +180,9 @@ class MigrationResponse:
             "destination_database": self.destination_database,
             "status": self.status,
             "description": self.description,
+            "aws_connection_id": self.aws_connection_id,
+            "source_database_config_id": self.source_database_config_id,
+            "destination_database_config_id": self.destination_database_config_id,
             "created_at": self.created_at,
             "updated_at": self.updated_at,
         }
@@ -151,6 +197,9 @@ class MigrationResponse:
             destination_database=migration.destination_database,
             status=migration.status,
             description=migration.description,
+            aws_connection_id=migration.aws_connection_id,
+            source_database_config_id=migration.source_database_config_id,
+            destination_database_config_id=migration.destination_database_config_id,
             created_at=migration.created_at.isoformat() if migration.created_at else "",
             updated_at=migration.updated_at.isoformat() if migration.updated_at else "",
         )

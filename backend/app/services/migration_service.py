@@ -47,6 +47,9 @@ class MigrationService:
                 destination_database=create_request.destination_database,
                 status=MigrationStatus.PENDING,
                 description=create_request.description,
+                aws_connection_id=create_request.aws_connection_id,
+                source_database_config_id=create_request.source_database_config_id,
+                destination_database_config_id=create_request.destination_database_config_id,
             )
             db.session.add(migration_job)
             db.session.commit()
@@ -85,6 +88,12 @@ class MigrationService:
                 migration_job.status = update_request.status
             if update_request.description is not None:
                 migration_job.description = update_request.description
+            if update_request.aws_connection_id is not None:
+                migration_job.aws_connection_id = update_request.aws_connection_id
+            if update_request.source_database_config_id is not None:
+                migration_job.source_database_config_id = update_request.source_database_config_id
+            if update_request.destination_database_config_id is not None:
+                migration_job.destination_database_config_id = update_request.destination_database_config_id
 
             migration_job.updated_at = datetime.utcnow()
             db.session.commit()

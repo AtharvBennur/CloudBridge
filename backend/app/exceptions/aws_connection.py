@@ -28,3 +28,7 @@ class AWSConnectionValidationError(AWSConnectionError):
 
 class AWSConnectionNotFoundError(AWSConnectionError):
     """Raised when an AWS connection cannot be located by ID."""
+
+
+class AWSConnectionIntegrationError(AWSConnectionError):
+    """Raised when an AWS API integration call fails."""

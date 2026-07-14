@@ -1,4 +1,4 @@
-import { Activity, ChevronLeft, ChevronRight, Cloud, Database, LayoutDashboard, ShieldCheck } from "lucide-react";
+import { ChevronLeft, ChevronRight, ClipboardCheck, Cloud, Database, LayoutDashboard, Server } from "lucide-react";
 import { NavLink } from "react-router-dom";
 
 import { Button } from "@/components/ui/button";
@@ -7,9 +7,9 @@ import { cn } from "@/lib/utils";
 const navigationItems = [
   { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
   { label: "Migrations", href: "/migrations", icon: Database },
+  { label: "Databases", href: "/database-configs", icon: Server },
   { label: "AWS Connections", href: "/aws-connections", icon: Cloud },
-  { label: "Health", href: "/dashboard", icon: Activity },
-  { label: "Auth", href: "/dashboard", icon: ShieldCheck },
+  { label: "Pre-flight", href: "/preflight", icon: ClipboardCheck },
 ];
 
 export function Sidebar({ isCollapsed, onToggle }: { isCollapsed: boolean; onToggle: (value: boolean) => void }) {
