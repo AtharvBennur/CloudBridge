@@ -2,12 +2,18 @@ from flask import Flask
 
 from app.config import get_config
 from app.errors import register_error_handlers
-from app.extensions import cors, db
+from app.extensions import cors, db, socketio
 from app.logging import configure_logging
 from app.models.aws_connection import AWSConnection
 from app.models.database_config import DatabaseConfig
 from app.models.migration import MigrationJob
 from app.models.migration_checkpoint import MigrationCheckpoint
+from app.models.cdc_config import CDCConfig
+from app.models.cdc_event import CDCEvent
+from app.models.schema_snapshot import SchemaSnapshot, SchemaDriftEvent
+from app.models.ecs_task import ECSTask
+from app.models.audit_log import AuditLog
+from app.models.notification import NotificationConfig, Notification
 from app.routes.auth import auth_bp
 from app.routes.aws_connection import aws_connection_bp
 from app.routes.database_config import database_config_bp
@@ -15,6 +21,14 @@ from app.routes.health import health_bp
 from app.routes.migration import migration_bp
 from app.routes.migration_engine import migration_engine_bp
 from app.routes.preflight import preflight_bp
+from app.routes.cdc import cdc_bp
+from app.routes.schema_drift import schema_drift_bp
+from app.routes.schema_approval import schema_approval_bp
+from app.routes.ecs import ecs_bp
+from app.routes.observability import observability_bp
+from app.routes.notification import notification_bp
+from app.routes.rollback import rollback_bp
+from app.routes.websocket import handle_connect, handle_disconnect, handle_join_migration, handle_leave_migration, handle_join_ecs_task, handle_leave_ecs_task, handle_ping
 
 
 def create_app(config_name: str | None = None) -> Flask:
@@ -25,6 +39,7 @@ def create_app(config_name: str | None = None) -> Flask:
     register_extensions(app)
     register_blueprints(app)
     register_error_handlers(app)
+    register_websocket_handlers(app)
 
     with app.app_context():
         db.create_all()
@@ -46,3 +61,24 @@ def register_blueprints(app: Flask) -> None:
     app.register_blueprint(aws_connection_bp)
     app.register_blueprint(database_config_bp)
     app.register_blueprint(preflight_bp)
+    app.register_blueprint(cdc_bp)
+    app.register_blueprint(schema_drift_bp)
+    app.register_blueprint(schema_approval_bp)
+    app.register_blueprint(ecs_bp)
+    app.register_blueprint(observability_bp)
+    app.register_blueprint(notification_bp)
+    app.register_blueprint(rollback_bp)
+
+
+def register_websocket_handlers(app: Flask) -> None:
+    """Register WebSocket event handlers."""
+    socketio.init_app(app, cors_allowed_origins="*", async_mode="threading")
+    
+    # Register event handlers
+    socketio.on("connect")(handle_connect)
+    socketio.on("disconnect")(handle_disconnect)
+    socketio.on("join_migration")(handle_join_migration)
+    socketio.on("leave_migration")(handle_leave_migration)
+    socketio.on("join_ecs_task")(handle_join_ecs_task)
+    socketio.on("leave_ecs_task")(handle_leave_ecs_task)
+    socketio.on("ping")(handle_ping)
