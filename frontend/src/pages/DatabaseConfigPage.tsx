@@ -54,9 +54,9 @@ export function DatabaseConfigPage() {
       const payload: any = {
         name: formValues.name,
         database_type: formValues.database_type,
-        host: formValues.purpose === "DESTINATION" && formValues.dest_option === "B" ? "pending" : formValues.host,
+        host: formValues.purpose === "DESTINATION" && formValues.dest_option === "B" ? "" : formValues.host,
         port: Number(formValues.port),
-        username: formValues.purpose === "DESTINATION" && formValues.dest_option === "B" ? "pending" : formValues.username,
+        username: formValues.purpose === "DESTINATION" && formValues.dest_option === "B" ? "" : formValues.username,
         purpose: formValues.purpose,
       };
 
@@ -117,7 +117,6 @@ export function DatabaseConfigPage() {
           </div>
           <div>
             <div className="mb-2 flex items-center gap-2">
-              <Badge variant="success">Sprint 5</Badge>
               <Badge variant="secondary">AWS Secrets Integration</Badge>
             </div>
             <h1 className="text-3xl font-semibold tracking-tight">Database Configurations</h1>

@@ -1,22 +1,22 @@
-import { ChevronLeft, ChevronRight, ClipboardCheck, Cloud, Database, LayoutDashboard, Server, Activity, GitCompare, Settings, ShieldCheck, Zap } from "lucide-react";
+import { ChevronLeft, ChevronRight, ClipboardCheck, Cloud, Database, LayoutDashboard, Server, Activity, GitCompare, Settings, ShieldCheck, Zap, BarChart3, Bell, RotateCcw } from "lucide-react";
 import { NavLink } from "react-router-dom";
 
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
 const navigationItems = [
-  { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard, category: "Main" },
-  { label: "Migrations", href: "/migrations", icon: Database, category: "Main" },
-  { label: "CDC Replication", href: "/cdc", icon: Zap, category: "Migration" },
-  { label: "Schema Drift", href: "/schema-drift", icon: GitCompare, category: "Migration" },
-  { label: "Approvals", href: "/approvals", icon: ShieldCheck, category: "Migration" },
+  { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard, category: "Overview" },
+  { label: "Migrations", href: "/migrations", icon: Database, category: "Overview" },
+  { label: "CDC Replication", href: "/cdc", icon: Zap, category: "Data" },
+  { label: "Schema Drift", href: "/schema-drift", icon: GitCompare, category: "Data" },
+  { label: "Approvals", href: "/approvals", icon: ShieldCheck, category: "Data" },
+  { label: "Rollback", href: "/rollback", icon: RotateCcw, category: "Data" },
   { label: "Databases", href: "/database-configs", icon: Server, category: "Infrastructure" },
   { label: "AWS Connections", href: "/aws-connections", icon: Cloud, category: "Infrastructure" },
   { label: "ECS Tasks", href: "/ecs", icon: Activity, category: "Infrastructure" },
   { label: "Pre-flight", href: "/preflight", icon: ClipboardCheck, category: "Infrastructure" },
-  { label: "Observability", href: "/observability", icon: Activity, category: "Monitoring" },
-  { label: "Notifications", href: "/notifications", icon: ShieldCheck, category: "Monitoring" },
-  { label: "Rollback", href: "/rollback", icon: Settings, category: "Recovery" },
+  { label: "Observability", href: "/observability", icon: BarChart3, category: "Monitoring" },
+  { label: "Notifications", href: "/notifications", icon: Bell, category: "Monitoring" },
 ];
 
 export function Sidebar({ isCollapsed, onToggle }: { isCollapsed: boolean; onToggle: (value: boolean) => void }) {
@@ -26,14 +26,16 @@ export function Sidebar({ isCollapsed, onToggle }: { isCollapsed: boolean; onTog
     <aside className={cn("hidden shrink-0 border-r border-border/70 bg-gradient-to-b from-card/95 to-card/50 backdrop-blur-xl lg:flex", isCollapsed ? "w-20" : "w-72")}> 
       <div className="flex w-full flex-col px-4 py-6">
         <div className={cn("mb-8 flex items-center gap-3", isCollapsed && "justify-center")}> 
-          <div className="relative grid h-11 w-11 place-items-center rounded-2xl bg-gradient-to-br from-primary via-blue-500 to-indigo-600 text-sm font-bold text-primary-foreground shadow-xl shadow-primary/20">
-            <span className="relative z-10">CB</span>
-            <div className="absolute inset-0 rounded-2xl bg-gradient-to-br from-white/20 to-transparent" />
+          <div className="relative">
+            <div className="absolute inset-0 rounded-2xl bg-gradient-to-br from-primary to-blue-500 blur-lg opacity-50" />
+            <div className="relative grid h-11 w-11 place-items-center rounded-2xl bg-gradient-to-br from-primary to-blue-500 text-white shadow-xl shadow-primary/20">
+              <Cloud className="h-5 w-5" />
+            </div>
           </div>
           {!isCollapsed ? (
             <div>
               <p className="text-base font-semibold tracking-tight">CloudBridge</p>
-              <p className="text-xs text-muted-foreground font-medium">Enterprise Platform</p>
+              <p className="text-xs text-muted-foreground font-medium">Enterprise Migration</p>
             </div>
           ) : null}
         </div>

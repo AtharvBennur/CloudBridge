@@ -10,7 +10,7 @@ export function NotFoundPage() {
         <p className="text-sm font-semibold uppercase text-primary">404</p>
         <h1 className="mt-3 text-4xl font-semibold">Page not found</h1>
         <p className="mt-3 text-muted-foreground">
-          The route you opened is not part of the Sprint 1 console.
+          The page you're looking for doesn't exist or has been moved.
         </p>
         <Button asChild className="mt-6">
           <Link to="/dashboard">
