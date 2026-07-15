@@ -20,7 +20,7 @@ CloudBridge is a production-ready full-stack platform for managing database migr
 ### Backend
 - **Framework**: Flask 3 with application factory pattern
 - **Database**: SQLAlchemy ORM with Alembic migrations
-- **Authentication**: Cognito-ready (configurable)
+- **Authentication**: Google OAuth (configurable)
 - **AWS Integration**: STS AssumeRole, Secrets Manager, ECS/Fargate, CloudWatch
 - **Real-time**: Flask-SocketIO for WebSocket communication
 - **Logging**: Structured logging with configurable levels
@@ -101,6 +101,8 @@ copy .env.example .env
 
 Edit `.env` and fill in your credentials:
 - `SECRET_KEY`: Generate with `openssl rand -hex 32`
+- `GOOGLE_OAUTH_CLIENT_ID`: Google OAuth Client ID from Google Cloud Console
+- `GOOGLE_OAUTH_CLIENT_SECRET`: Google OAuth Client Secret from Google Cloud Console
 - `AWS_ACCESS_KEY_ID`: Your AWS access key
 - `AWS_SECRET_ACCESS_KEY`: Your AWS secret key
 - `CLOUDBRIDGE_AWS_ACCOUNT_ID`: Your AWS account ID
@@ -117,6 +119,7 @@ copy .env.example .env
 
 Edit `.env` and configure:
 - `VITE_API_BASE_URL`: Backend API URL (default: `http://localhost:5000`)
+- `VITE_GOOGLE_OAUTH_CLIENT_ID`: Google OAuth Client ID from Google Cloud Console
 
 ### 3. Backend Setup
 
@@ -302,6 +305,31 @@ WebSocket URL is auto-derived from `VITE_API_BASE_URL`. Override with:
 VITE_WS_BASE_URL=ws://your-backend-url
 ```
 
+## Authentication
+
+### Google OAuth Setup
+
+CloudBridge uses Google OAuth for authentication. To set it up:
+
+1. Go to [Google Cloud Console](https://console.cloud.google.com/)
+2. Create a new project or select existing one
+3. Enable Google+ API
+4. Create OAuth 2.0 credentials:
+   - Application type: Web application
+   - Authorized redirect URIs: `http://localhost:5173` (or your production URL)
+5. Copy Client ID and Client Secret
+6. Add to backend `.env`:
+   - `GOOGLE_OAUTH_CLIENT_ID=your-client-id`
+   - `GOOGLE_OAUTH_CLIENT_SECRET=your-client-secret`
+7. Add to frontend `.env`:
+   - `VITE_GOOGLE_OAUTH_CLIENT_ID=your-client-id`
+
+### Local Authentication
+
+For development without Google OAuth, you can use the local authentication:
+- Email: any valid email address
+- Password: minimum 8 characters
+
 ## Troubleshooting
 
 ### Backend Issues
@@ -321,6 +349,11 @@ pip install flask-socketio
 - Check IAM permissions
 - Ensure `CLOUDBRIDGE_AWS_ACCOUNT_ID` is correct
 
+**Google OAuth errors**
+- Verify Google OAuth credentials in `.env`
+- Check redirect URIs match in Google Cloud Console
+- Ensure OAuth consent screen is configured
+
 ### Frontend Issues
 
 **Module not found errors**
@@ -337,6 +370,11 @@ npm install
 - Verify WebSocket URL
 - Check backend WebSocket configuration
 - Ensure no firewall blocking WebSocket connections
+
+**Dark/Light mode not working**
+- Check browser console for errors
+- Verify ThemeContext is properly initialized
+- Check localStorage for theme settings
 
 ## Support
 

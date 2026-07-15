@@ -51,7 +51,11 @@ class AuthResponse:
     """Represents the structured JSON returned by authentication endpoints."""
 
     message: str
+    user: dict[str, Any] | None = None
 
-    def to_dict(self) -> dict[str, str]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert the response object into a JSON-safe dictionary."""
-        return {"message": self.message}
+        result = {"message": self.message}
+        if self.user:
+            result["user"] = self.user
+        return result

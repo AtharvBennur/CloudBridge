@@ -97,9 +97,8 @@ export function DashboardPage() {
         <div className="rounded-3xl border border-border/70 bg-gradient-to-br from-primary/10 via-card to-card p-6 shadow-soft flex flex-col justify-between">
           <div>
             <div className="flex items-center gap-2">
-              <Badge variant="success">Active Plane</Badge>
-              <Badge variant="secondary">Sprint 5</Badge>
-              <Badge variant="indigo">STS AssumeRole Live</Badge>
+              <Badge variant="success">System Online</Badge>
+              <Badge variant="indigo">Enterprise Edition</Badge>
             </div>
             <h1 className="mt-4 text-3xl font-semibold leading-tight tracking-tight md:text-4xl">
               Database Migration Console
@@ -149,7 +148,7 @@ export function DashboardPage() {
                   <Badge variant={apiStatus === "Healthy" ? "success" : "warning"}>{apiStatus}</Badge>
                 </div>
                 <div className="rounded-xl border bg-muted/20 p-3 text-xs text-muted-foreground">
-                  The CloudBridge orchestration engine is operational and communicating with your sqlite metadata base.
+                  The CloudBridge orchestration engine is operational and communicating with your metadata database.
                 </div>
               </div>
             )}

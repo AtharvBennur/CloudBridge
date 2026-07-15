@@ -19,6 +19,8 @@ import { ECSPage } from "@/pages/ECSPage";
 import { ObservabilityPage } from "@/pages/ObservabilityPage";
 import { NotificationsPage } from "@/pages/NotificationsPage";
 import { RollbackPage } from "@/pages/RollbackPage";
+import { AccountPage } from "@/pages/AccountPage";
+import { SettingsPage } from "@/pages/SettingsPage";
 
 export function App() {
   return (
@@ -104,6 +106,8 @@ export function App() {
         <Route path="/observability" element={<ProtectedRoute><AppShell><ObservabilityPage /></AppShell></ProtectedRoute>} />
         <Route path="/notifications" element={<ProtectedRoute><AppShell><NotificationsPage /></AppShell></ProtectedRoute>} />
         <Route path="/rollback" element={<ProtectedRoute><AppShell><RollbackPage /></AppShell></ProtectedRoute>} />
+        <Route path="/account" element={<ProtectedRoute><AppShell><AccountPage /></AppShell></ProtectedRoute>} />
+        <Route path="/settings" element={<ProtectedRoute><AppShell><SettingsPage /></AppShell></ProtectedRoute>} />
         <Route path="*" element={<NotFoundPage />} />
       </Routes>
     </BrowserRouter>

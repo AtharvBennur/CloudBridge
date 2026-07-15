@@ -1,4 +1,4 @@
-import { ChevronLeft, ChevronRight, ClipboardCheck, Cloud, Database, LayoutDashboard, Server, Activity, GitCompare, Settings, ShieldCheck, Zap, BarChart3, Bell, RotateCcw } from "lucide-react";
+import { ChevronLeft, ChevronRight, ClipboardCheck, Cloud, Database, LayoutDashboard, Server, Activity, GitCompare, Settings, ShieldCheck, Zap, BarChart3, RotateCcw } from "lucide-react";
 import { NavLink } from "react-router-dom";
 
 import { Button } from "@/components/ui/button";
@@ -16,7 +16,6 @@ const navigationItems = [
   { label: "ECS Tasks", href: "/ecs", icon: Activity, category: "Infrastructure" },
   { label: "Pre-flight", href: "/preflight", icon: ClipboardCheck, category: "Infrastructure" },
   { label: "Observability", href: "/observability", icon: BarChart3, category: "Monitoring" },
-  { label: "Notifications", href: "/notifications", icon: Bell, category: "Monitoring" },
 ];
 
 export function Sidebar({ isCollapsed, onToggle }: { isCollapsed: boolean; onToggle: (value: boolean) => void }) {

@@ -5,6 +5,12 @@ export interface LoginRequest {
   password: string;
 }
 
+export interface GoogleOAuthRequest {
+  id_token: string;
+  email?: string;
+  name?: string;
+}
+
 export interface AuthUser {
   email: string;
   displayName: string;
@@ -12,6 +18,7 @@ export interface AuthUser {
 
 export interface AuthApiMessage {
   message: string;
+  user?: AuthUser;
 }
 
 const SESSION_STORAGE_KEY = "cloudbridge.session";
@@ -31,12 +38,35 @@ export const authService = {
     assertValidLoginRequest(request);
 
     const response = await apiClient.post<AuthApiMessage>("/auth/login", request);
-    const user: AuthUser = {
+    const user: AuthUser = response.data.user || {
       email: request.email.trim().toLowerCase(),
       displayName: request.email.split("@")[0],
     };
 
     // Use a resilient storage accessor: prefer sessionStorage but fall back to localStorage
+    const storage = ((): Storage => {
+      try {
+        const s = window.sessionStorage;
+        const testKey = "__cloudbridge_test";
+        s.setItem(testKey, "1");
+        s.removeItem(testKey);
+        return s;
+      } catch {
+        return window.localStorage;
+      }
+    })();
+
+    storage.setItem(SESSION_STORAGE_KEY, JSON.stringify({ user, message: response.data.message }));
+    return user;
+  },
+
+  async googleOAuthLogin(request: GoogleOAuthRequest): Promise<AuthUser> {
+    const response = await apiClient.post<AuthApiMessage>("/auth/google-oauth", request);
+    const user: AuthUser = response.data.user || {
+      email: request.email || "user@gmail.com",
+      displayName: request.name || "Google User",
+    };
+
     const storage = ((): Storage => {
       try {
         const s = window.sessionStorage;

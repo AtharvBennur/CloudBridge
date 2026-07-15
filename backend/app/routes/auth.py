@@ -39,21 +39,29 @@ def handle_auth_error(error: AuthError):
 
 @auth_bp.post("/login")
 def login():
-    """Handle a login request and return the pending Cognito response."""
+    """Handle a login request and return authentication response."""
     payload = request.get_json(silent=True)
     response = auth_service.login(payload)
     return jsonify(response.to_dict()), 200
 
 
+@auth_bp.post("/google-oauth")
+def google_oauth_login():
+    """Handle Google OAuth login request."""
+    payload = request.get_json(silent=True)
+    response = auth_service.google_oauth_login(payload)
+    return jsonify(response.to_dict()), 200
+
+
 @auth_bp.post("/logout")
 def logout():
-    """Handle a logout request and return the pending Cognito response."""
+    """Handle a logout request and return authentication response."""
     response = auth_service.logout()
     return jsonify(response.to_dict()), 200
 
 
 @auth_bp.get("/me")
 def get_current_user():
-    """Handle a current-user lookup and return the pending Cognito response."""
+    """Handle a current-user lookup and return authentication response."""
     response = auth_service.get_current_user()
     return jsonify(response.to_dict()), 200

@@ -1,18 +1,99 @@
-import { Bell, LogOut, Menu, Search, ChevronDown, HelpCircle } from "lucide-react";
+import { Bell, LogOut, Menu, Search, ChevronDown, User, Settings, Check, X, AlertCircle, Info, CheckCircle } from "lucide-react";
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 
 import { ThemeToggle } from "@/components/theme/ThemeToggle";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { useAuth } from "@/context/AuthContext";
 import { cn } from "@/lib/utils";
+
+interface Notification {
+  id: string;
+  type: 'success' | 'error' | 'warning' | 'info';
+  title: string;
+  message: string;
+  timestamp: Date;
+  read: boolean;
+}
+
+const mockNotifications: Notification[] = [
+  {
+    id: '1',
+    type: 'success',
+    title: 'Migration Completed',
+    message: 'Database migration "prod-to-staging" completed successfully',
+    timestamp: new Date(Date.now() - 1000 * 60 * 5),
+    read: false
+  },
+  {
+    id: '2',
+    type: 'warning',
+    title: 'Schema Drift Detected',
+    message: 'Schema drift detected in "users" table',
+    timestamp: new Date(Date.now() - 1000 * 60 * 30),
+    read: false
+  },
+  {
+    id: '3',
+    type: 'info',
+    title: 'ECS Task Started',
+    message: 'Migration worker task started on ECS cluster',
+    timestamp: new Date(Date.now() - 1000 * 60 * 60),
+    read: true
+  },
+  {
+    id: '4',
+    type: 'error',
+    title: 'Connection Failed',
+    message: 'AWS connection failed for account "prod-account"',
+    timestamp: new Date(Date.now() - 1000 * 60 * 120),
+    read: true
+  }
+];
 
 export function TopNavbar({ isCollapsed, onToggle }: { isCollapsed: boolean; onToggle: (value: boolean) => void }) {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
+  const [showProfileMenu, setShowProfileMenu] = useState(false);
+  const [showNotifications, setShowNotifications] = useState(false);
+  const [notifications, setNotifications] = useState<Notification[]>(mockNotifications);
 
   const handleLogout = async () => {
     await logout();
     navigate("/login", { replace: true });
+  };
+
+  const markAsRead = (id: string) => {
+    setNotifications(notifications.map(n => n.id === id ? { ...n, read: true } : n));
+  };
+
+  const markAllAsRead = () => {
+    setNotifications(notifications.map(n => ({ ...n, read: true })));
+  };
+
+  const unreadCount = notifications.filter(n => !n.read).length;
+
+  const getNotificationIcon = (type: Notification['type']) => {
+    switch (type) {
+      case 'success': return <CheckCircle className="h-4 w-4 text-emerald-500" />;
+      case 'error': return <X className="h-4 w-4 text-red-500" />;
+      case 'warning': return <AlertCircle className="h-4 w-4 text-amber-500" />;
+      case 'info': return <Info className="h-4 w-4 text-blue-500" />;
+    }
+  };
+
+  const formatTimestamp = (date: Date) => {
+    const now = new Date();
+    const diff = now.getTime() - date.getTime();
+    const minutes = Math.floor(diff / 60000);
+    const hours = Math.floor(diff / 3600000);
+    const days = Math.floor(diff / 86400000);
+
+    if (minutes < 1) return 'Just now';
+    if (minutes < 60) return `${minutes}m ago`;
+    if (hours < 24) return `${hours}h ago`;
+    return `${days}d ago`;
   };
 
   return (
@@ -40,24 +121,139 @@ export function TopNavbar({ isCollapsed, onToggle }: { isCollapsed: boolean; onT
         </div>
 
         <div className="flex items-center gap-2">
-          <Button variant="ghost" size="icon" className="relative hover:bg-muted/50" aria-label="Notifications">
-            <Bell className="h-4 w-4" />
-            <span className="absolute top-1.5 right-1.5 h-2 w-2 rounded-full bg-red-500" />
-          </Button>
-          <Button variant="ghost" size="icon" className="hover:bg-muted/50" aria-label="Help">
-            <HelpCircle className="h-4 w-4" />
-          </Button>
-          <div className="hidden md:flex items-center gap-3 pl-2 border-l border-border/50">
-            <div className="text-right">
-              <p className="text-sm font-medium text-foreground">{user?.displayName || "Admin User"}</p>
-              <p className="text-xs text-muted-foreground">{user?.email || "admin@cloudbridge.io"}</p>
-            </div>
-            <div className="h-9 w-9 rounded-full bg-gradient-to-br from-primary to-blue-500 flex items-center justify-center text-sm font-semibold text-primary-foreground shadow-md">
-              {user?.displayName?.charAt(0) || "A"}
-            </div>
-            <Button variant="ghost" size="icon" className="hover:bg-muted/50" onClick={handleLogout} aria-label="Sign out" title="Sign out">
-              <LogOut className="h-4 w-4" />
+          <div className="relative">
+            <Button 
+              variant="ghost" 
+              size="icon" 
+              className="relative hover:bg-muted/50" 
+              aria-label="Notifications"
+              onClick={() => setShowNotifications(!showNotifications)}
+            >
+              <Bell className="h-4 w-4" />
+              {unreadCount > 0 && (
+                <span className="absolute top-1.5 right-1.5 h-2 w-2 rounded-full bg-red-500" />
+              )}
             </Button>
+            
+            {showNotifications && (
+              <div className="absolute right-0 top-12 w-96 rounded-xl border border-border/70 bg-background/95 backdrop-blur-xl shadow-soft p-2">
+                <div className="flex items-center justify-between px-3 py-2 border-b border-border/50 mb-2">
+                  <h3 className="font-semibold text-sm">Notifications</h3>
+                  {unreadCount > 0 && (
+                    <Button 
+                      variant="ghost" 
+                      size="sm" 
+                      className="h-7 text-xs"
+                      onClick={markAllAsRead}
+                    >
+                      Mark all read
+                    </Button>
+                  )}
+                </div>
+                <div className="max-h-80 overflow-y-auto space-y-1">
+                  {notifications.length === 0 ? (
+                    <div className="py-8 text-center text-sm text-muted-foreground">
+                      No notifications
+                    </div>
+                  ) : (
+                    notifications.map(notification => (
+                      <div
+                        key={notification.id}
+                        className={cn(
+                          "p-3 rounded-lg hover:bg-muted/50 cursor-pointer transition-colors",
+                          !notification.read && "bg-muted/30"
+                        )}
+                        onClick={() => {
+                          markAsRead(notification.id);
+                          setShowNotifications(false);
+                        }}
+                      >
+                        <div className="flex items-start gap-3">
+                          {getNotificationIcon(notification.type)}
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center justify-between gap-2">
+                              <p className="text-sm font-medium text-foreground truncate">{notification.title}</p>
+                              {!notification.read && (
+                                <div className="h-2 w-2 rounded-full bg-primary flex-shrink-0" />
+                              )}
+                            </div>
+                            <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">{notification.message}</p>
+                            <p className="text-xs text-muted-foreground/60 mt-1">{formatTimestamp(notification.timestamp)}</p>
+                          </div>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+                <div className="border-t border-border/50 mt-2 pt-2">
+                  <Button 
+                    variant="ghost" 
+                    className="w-full justify-center h-9 text-sm"
+                    onClick={() => {
+                      setShowNotifications(false);
+                      navigate('/notifications');
+                    }}
+                  >
+                    View all notifications
+                  </Button>
+                </div>
+              </div>
+            )}
+          </div>
+          
+          <div className="hidden md:flex items-center gap-3 pl-2 border-l border-border/50 relative">
+            <Button 
+              variant="ghost" 
+              className="flex items-center gap-2 h-10 px-2 hover:bg-muted/50"
+              onClick={() => setShowProfileMenu(!showProfileMenu)}
+            >
+              <div className="h-8 w-8 rounded-full bg-gradient-to-br from-primary to-blue-500 flex items-center justify-center text-sm font-semibold text-primary-foreground shadow-md">
+                {user?.displayName?.charAt(0) || "A"}
+              </div>
+              <ChevronDown className="h-4 w-4" />
+            </Button>
+            
+            {showProfileMenu && (
+              <div className="absolute right-0 top-12 w-56 rounded-xl border border-border/70 bg-background/95 backdrop-blur-xl shadow-soft p-2">
+                <div className="px-3 py-2 border-b border-border/50 mb-2">
+                  <p className="text-sm font-medium text-foreground">{user?.displayName || "Admin User"}</p>
+                  <p className="text-xs text-muted-foreground">{user?.email || "admin@cloudbridge.io"}</p>
+                </div>
+                <div className="space-y-1">
+                  <Button 
+                    variant="ghost" 
+                    className="w-full justify-start h-9"
+                    onClick={() => {
+                      setShowProfileMenu(false);
+                      navigate('/account');
+                    }}
+                  >
+                    <User className="h-4 w-4 mr-2" />
+                    Account
+                  </Button>
+                  <Button 
+                    variant="ghost" 
+                    className="w-full justify-start h-9"
+                    onClick={() => {
+                      setShowProfileMenu(false);
+                      navigate('/settings');
+                    }}
+                  >
+                    <Settings className="h-4 w-4 mr-2" />
+                    Settings
+                  </Button>
+                  <div className="border-t border-border/50 my-1" />
+                  <Button 
+                    variant="ghost" 
+                    className="w-full justify-start h-9 text-red-500 hover:text-red-600 hover:bg-red-500/10"
+                    onClick={handleLogout}
+                  >
+                    <LogOut className="h-4 w-4 mr-2" />
+                    Sign out
+                  </Button>
+                </div>
+              </div>
+            )}
           </div>
           <ThemeToggle />
         </div>
