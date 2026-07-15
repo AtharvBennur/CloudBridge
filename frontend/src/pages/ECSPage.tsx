@@ -1,11 +1,52 @@
+import { useQuery } from "@tanstack/react-query";
 import { motion } from "framer-motion";
 import { Activity, Play, Pause, Square, Server, Clock, CheckCircle2, AlertTriangle } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/skeleton";
+import { ecsService } from "@/services/ecsService";
 
 export function ECSPage() {
+  const ecsTasksQuery = useQuery({
+    queryKey: ["ecs-tasks"],
+    queryFn: () => ecsService.listTasks(1), // TODO: Get from route params
+  });
+
+  const handleStart = async (taskId: number) => {
+    try {
+      await ecsService.startTask(taskId);
+      ecsTasksQuery.refetch();
+    } catch (error) {
+      console.error("Failed to start task:", error);
+    }
+  };
+
+  const handleStop = async (taskId: number) => {
+    try {
+      await ecsService.stopTask(taskId, "User stopped");
+      ecsTasksQuery.refetch();
+    } catch (error) {
+      console.error("Failed to stop task:", error);
+    }
+  };
+
+  const handleRetry = async (taskId: number) => {
+    try {
+      await ecsService.retryTask(taskId);
+      ecsTasksQuery.refetch();
+    } catch (error) {
+      console.error("Failed to retry task:", error);
+    }
+  };
+
+  const tasks = ecsTasksQuery.data || [];
+  const runningTasks = tasks.filter(t => t.status === "RUNNING").length;
+  const pendingTasks = tasks.filter(t => t.status === "PENDING").length;
+  const failedTasks = tasks.filter(t => t.status === "FAILED").length;
+  const completedTasks = tasks.filter(t => t.status === "STOPPED").length;
+
   return (
     <div className="mx-auto max-w-7xl space-y-6">
       <motion.div
@@ -43,7 +84,7 @@ export function ECSPage() {
             <CardTitle className="text-lg">Running Tasks</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-3xl font-semibold text-emerald-600">8</div>
+            <div className="text-3xl font-semibold text-emerald-600">{runningTasks}</div>
             <p className="text-xs text-muted-foreground mt-1">Active Fargate tasks</p>
           </CardContent>
         </Card>
@@ -53,7 +94,7 @@ export function ECSPage() {
             <CardTitle className="text-lg">Pending</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-3xl font-semibold text-orange-600">3</div>
+            <div className="text-3xl font-semibold text-orange-600">{pendingTasks}</div>
             <p className="text-xs text-muted-foreground mt-1">Queued for execution</p>
           </CardContent>
         </Card>
@@ -63,7 +104,7 @@ export function ECSPage() {
             <CardTitle className="text-lg">Failed</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-3xl font-semibold text-red-600">1</div>
+            <div className="text-3xl font-semibold text-red-600">{failedTasks}</div>
             <p className="text-xs text-muted-foreground mt-1">Requires attention</p>
           </CardContent>
         </Card>
@@ -73,7 +114,7 @@ export function ECSPage() {
             <CardTitle className="text-lg">Completed</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-3xl font-semibold">142</div>
+            <div className="text-3xl font-semibold">{completedTasks}</div>
             <p className="text-xs text-muted-foreground mt-1">Total tasks run</p>
           </CardContent>
         </Card>
@@ -86,28 +127,35 @@ export function ECSPage() {
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
-            {[
-              { name: "migration-prod-dr", status: "RUNNING", cpu: "256", memory: "512", started: "2h 34m", migration: "Production to DR" },
-              { name: "migration-analytics", status: "RUNNING", cpu: "512", memory: "1024", started: "1h 12m", migration: "Analytics to Warehouse" },
-              { name: "migration-legacy", status: "STOPPED", cpu: "256", memory: "512", started: "45m", migration: "Legacy to Cloud" },
-              { name: "migration-test", status: "FAILED", cpu: "256", memory: "512", started: "23m", migration: "Test Migration" },
-            ].map((task, index) => (
-              <div key={index} className="flex items-center justify-between p-4 border border-border/70 rounded-2xl bg-background/50 hover:bg-muted/20 transition">
+            {ecsTasksQuery.isLoading && (
+              <div className="space-y-2">
+                <Skeleton className="h-16 w-full" />
+                <Skeleton className="h-16 w-full" />
+                <Skeleton className="h-16 w-full" />
+              </div>
+            )}
+            {!ecsTasksQuery.isLoading && tasks.length === 0 && (
+              <div className="py-6 text-center text-sm text-muted-foreground border border-dashed rounded-xl">
+                No ECS tasks configured. Create a task to start migration execution on Fargate.
+              </div>
+            )}
+            {!ecsTasksQuery.isLoading && tasks.map((task) => (
+              <div key={task.id} className="flex items-center justify-between p-4 border border-border/70 rounded-2xl bg-background/50 hover:bg-muted/20 transition">
                 <div className="flex items-center gap-4">
                   <div className={`h-10 w-10 rounded-xl flex items-center justify-center ${
-                    task.status === "RUNNING" ? "bg-emerald-500/10 text-emerald-600" : 
-                    task.status === "STOPPED" ? "bg-gray-500/10 text-gray-600" : 
+                    task.status === "RUNNING" ? "bg-emerald-500/10 text-emerald-600" :
+                    task.status === "STOPPED" ? "bg-gray-500/10 text-gray-600" :
                     "bg-red-500/10 text-red-600"
                   }`}>
                     <Server className="h-5 w-5" />
                   </div>
                   <div>
-                    <h4 className="font-semibold">{task.name}</h4>
-                    <p className="text-sm text-muted-foreground">{task.migration}</p>
+                    <h4 className="font-semibold">{task.task_definition_arn.split('/').pop()}</h4>
+                    <p className="text-sm text-muted-foreground">Cluster: {task.cluster_arn.split('/').pop()}</p>
                     <div className="flex items-center gap-4 mt-1 text-xs text-muted-foreground">
                       <span>CPU: {task.cpu}</span>
                       <span>Memory: {task.memory}MB</span>
-                      <span>Started: {task.started}</span>
+                      <span>Type: {task.launch_type}</span>
                     </div>
                   </div>
                 </div>
@@ -118,19 +166,16 @@ export function ECSPage() {
                   <div className="flex gap-2">
                     {task.status === "RUNNING" ? (
                       <>
-                        <Button variant="ghost" size="icon">
-                          <Pause className="h-4 w-4" />
-                        </Button>
-                        <Button variant="ghost" size="icon">
+                        <Button variant="ghost" size="icon" onClick={() => handleStop(task.id)}>
                           <Square className="h-4 w-4" />
                         </Button>
                       </>
-                    ) : task.status === "STOPPED" ? (
-                      <Button variant="ghost" size="icon">
+                    ) : task.status === "FAILED" ? (
+                      <Button variant="ghost" size="icon" onClick={() => handleRetry(task.id)}>
                         <Play className="h-4 w-4" />
                       </Button>
                     ) : (
-                      <Button variant="ghost" size="icon">
+                      <Button variant="ghost" size="icon" onClick={() => handleStart(task.id)}>
                         <Play className="h-4 w-4" />
                       </Button>
                     )}

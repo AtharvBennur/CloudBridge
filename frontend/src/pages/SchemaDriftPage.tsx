@@ -5,8 +5,48 @@ import { GitCompare, AlertTriangle, CheckCircle2, Clock, Database, Plus, Camera 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/skeleton";
+import { schemaDriftService } from "@/services/schemaDriftService";
 
 export function SchemaDriftPage() {
+  const driftEventsQuery = useQuery({
+    queryKey: ["drift-events"],
+    queryFn: () => schemaDriftService.listDriftEvents(1), // TODO: Get from route params
+  });
+
+  const handleApprove = async (eventId: number) => {
+    try {
+      await schemaDriftService.approveDriftEvent(eventId, "user");
+      driftEventsQuery.refetch();
+    } catch (error) {
+      console.error("Failed to approve drift event:", error);
+    }
+  };
+
+  const handleReject = async (eventId: number) => {
+    try {
+      await schemaDriftService.rejectDriftEvent(eventId, "Rejected by user", "user");
+      driftEventsQuery.refetch();
+    } catch (error) {
+      console.error("Failed to reject drift event:", error);
+    }
+  };
+
+  const handleIgnore = async (eventId: number) => {
+    try {
+      await schemaDriftService.ignoreDriftEvent(eventId);
+      driftEventsQuery.refetch();
+    } catch (error) {
+      console.error("Failed to ignore drift event:", error);
+    }
+  };
+
+  const events = driftEventsQuery.data || [];
+  const totalChanges = events.length;
+  const pendingApproval = events.filter(e => e.status === "PENDING").length;
+  const autoApplied = events.filter(e => e.status === "AUTO_APPLIED").length;
+  const rejected = events.filter(e => e.status === "REJECTED").length;
+
   return (
     <div className="mx-auto max-w-7xl space-y-6">
       <motion.div
@@ -44,8 +84,8 @@ export function SchemaDriftPage() {
             <CardTitle className="text-lg">Total Changes</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-3xl font-semibold">24</div>
-            <p className="text-xs text-muted-foreground mt-1">Detected this week</p>
+            <div className="text-3xl font-semibold">{totalChanges}</div>
+            <p className="text-xs text-muted-foreground mt-1">Detected changes</p>
           </CardContent>
         </Card>
 
@@ -54,7 +94,7 @@ export function SchemaDriftPage() {
             <CardTitle className="text-lg">Pending Approval</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-3xl font-semibold text-orange-600">7</div>
+            <div className="text-3xl font-semibold text-orange-600">{pendingApproval}</div>
             <p className="text-xs text-muted-foreground mt-1">Awaiting review</p>
           </CardContent>
         </Card>
@@ -64,7 +104,7 @@ export function SchemaDriftPage() {
             <CardTitle className="text-lg">Auto-Applied</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-3xl font-semibold text-emerald-600">15</div>
+            <div className="text-3xl font-semibold text-emerald-600">{autoApplied}</div>
             <p className="text-xs text-muted-foreground mt-1">Safe changes</p>
           </CardContent>
         </Card>
@@ -74,7 +114,7 @@ export function SchemaDriftPage() {
             <CardTitle className="text-lg">Rejected</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-3xl font-semibold text-red-600">2</div>
+            <div className="text-3xl font-semibold text-red-600">{rejected}</div>
             <p className="text-xs text-muted-foreground mt-1">Blocked changes</p>
           </CardContent>
         </Card>
@@ -87,39 +127,48 @@ export function SchemaDriftPage() {
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
-            {[
-              { type: "ADD_COLUMN", table: "users", column: "phone_number", risk: "SAFE", status: "APPLIED" },
-              { type: "DROP_COLUMN", table: "orders", column: "legacy_id", risk: "HIGH", status: "PENDING" },
-              { type: "CREATE_INDEX", table: "products", column: "sku_idx", risk: "SAFE", status: "APPLIED" },
-              { type: "ALTER_TABLE", table: "transactions", column: "amount", risk: "HIGH", status: "PENDING" },
-            ].map((change, index) => (
-              <div key={index} className="flex items-center justify-between p-4 border border-border/70 rounded-2xl bg-background/50 hover:bg-muted/20 transition">
+            {driftEventsQuery.isLoading && (
+              <div className="space-y-2">
+                <Skeleton className="h-16 w-full" />
+                <Skeleton className="h-16 w-full" />
+                <Skeleton className="h-16 w-full" />
+              </div>
+            )}
+            {!driftEventsQuery.isLoading && events.length === 0 && (
+              <div className="py-6 text-center text-sm text-muted-foreground border border-dashed rounded-xl">
+                No schema drift detected. Compare schema snapshots to detect changes.
+              </div>
+            )}
+            {!driftEventsQuery.isLoading && events.slice(0, 10).map((event) => (
+              <div key={event.id} className="flex items-center justify-between p-4 border border-border/70 rounded-2xl bg-background/50 hover:bg-muted/20 transition">
                 <div className="flex items-center gap-4">
                   <div className={`h-10 w-10 rounded-xl flex items-center justify-center ${
-                    change.risk === "SAFE" ? "bg-emerald-500/10 text-emerald-600" : 
-                    change.risk === "HIGH" ? "bg-red-500/10 text-red-600" : 
-                    "bg-orange-500/10 text-orange-600"
+                    event.risk_level === "SAFE" ? "bg-emerald-500/10 text-emerald-600" :
+                    event.risk_level === "MODERATE" ? "bg-orange-500/10 text-orange-600" :
+                    event.risk_level === "HIGH" ? "bg-red-500/10 text-red-600" :
+                    "bg-purple-500/10 text-purple-600"
                   }`}>
                     <Database className="h-5 w-5" />
                   </div>
                   <div>
-                    <h4 className="font-semibold">{change.type.replace('_', ' ')}</h4>
+                    <h4 className="font-semibold">{event.change_type.replace('_', ' ')}</h4>
                     <p className="text-sm text-muted-foreground">
-                      Table: {change.table} {change.column ? `• ${change.column}` : ''}
+                      Table: {event.table_name} {event.column_name ? `• ${event.column_name}` : ''} {event.index_name ? `• ${event.index_name}` : ''}
                     </p>
                   </div>
                 </div>
                 <div className="flex items-center gap-4">
-                  <Badge variant={change.risk === "SAFE" ? "success" : change.risk === "HIGH" ? "destructive" : "warning"}>
-                    {change.risk}
+                  <Badge variant={event.risk_level === "SAFE" ? "success" : event.risk_level === "HIGH" ? "destructive" : "warning"}>
+                    {event.risk_level}
                   </Badge>
-                  <Badge variant={change.status === "APPLIED" ? "success" : "secondary"}>
-                    {change.status}
+                  <Badge variant={event.status === "APPROVED" || event.status === "AUTO_APPLIED" ? "success" : event.status === "REJECTED" ? "destructive" : "secondary"}>
+                    {event.status}
                   </Badge>
-                  {change.status === "PENDING" && (
+                  {event.status === "PENDING" && (
                     <div className="flex gap-2">
-                      <Button variant="ghost" size="sm">Approve</Button>
-                      <Button variant="ghost" size="sm">Reject</Button>
+                      <Button variant="ghost" size="sm" onClick={() => handleApprove(event.id)}>Approve</Button>
+                      <Button variant="ghost" size="sm" onClick={() => handleReject(event.id)}>Reject</Button>
+                      <Button variant="ghost" size="sm" onClick={() => handleIgnore(event.id)}>Ignore</Button>
                     </div>
                   )}
                 </div>

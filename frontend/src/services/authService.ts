@@ -36,19 +36,56 @@ export const authService = {
       displayName: request.email.split("@")[0],
     };
 
-    window.sessionStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify({ user, message: response.data.message }));
+    // Use a resilient storage accessor: prefer sessionStorage but fall back to localStorage
+    const storage = ((): Storage => {
+      try {
+        const s = window.sessionStorage;
+        const testKey = "__cloudbridge_test";
+        s.setItem(testKey, "1");
+        s.removeItem(testKey);
+        return s;
+      } catch {
+        return window.localStorage;
+      }
+    })();
+
+    storage.setItem(SESSION_STORAGE_KEY, JSON.stringify({ user, message: response.data.message }));
     return user;
   },
 
   async logout(): Promise<void> {
     await apiClient.post<AuthApiMessage>("/auth/logout");
-    window.sessionStorage.removeItem(SESSION_STORAGE_KEY);
+    const storage = ((): Storage => {
+      try {
+        const s = window.sessionStorage;
+        const testKey = "__cloudbridge_test";
+        s.setItem(testKey, "1");
+        s.removeItem(testKey);
+        return s;
+      } catch {
+        return window.localStorage;
+      }
+    })();
+
+    storage.removeItem(SESSION_STORAGE_KEY);
   },
 
   async getCurrentUser(): Promise<AuthUser | null> {
     try {
       const response = await apiClient.get<AuthApiMessage>("/auth/me");
-      const rawSession = window.sessionStorage.getItem(SESSION_STORAGE_KEY);
+      const storage = ((): Storage => {
+        try {
+          const s = window.sessionStorage;
+          const testKey = "__cloudbridge_test";
+          s.setItem(testKey, "1");
+          s.removeItem(testKey);
+          return s;
+        } catch {
+          return window.localStorage;
+        }
+      })();
+
+      const rawSession = storage.getItem(SESSION_STORAGE_KEY);
       if (!rawSession) {
         return null;
       }

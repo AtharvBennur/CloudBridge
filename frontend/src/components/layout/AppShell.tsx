@@ -1,10 +1,25 @@
-import { useState, type ReactNode } from "react";
+import { useState, useEffect, type ReactNode } from "react";
 
 import { Sidebar } from "@/components/layout/Sidebar";
 import { TopNavbar } from "@/components/layout/TopNavbar";
+import { websocketService } from "@/services/websocketService";
+import { env } from "@/lib/env";
 
 export function AppShell({ children }: { children: ReactNode }) {
   const [isCollapsed, setIsCollapsed] = useState(false);
+
+  useEffect(() => {
+    // Initialize WebSocket connection
+    const wsUrl = env.apiBaseUrl.replace('http', 'ws');
+    websocketService.connect(wsUrl).catch((error) => {
+      console.error('Failed to connect to WebSocket:', error);
+    });
+
+    // Cleanup on unmount
+    return () => {
+      websocketService.disconnect();
+    };
+  }, []);
 
   return (
     <div className="min-h-screen bg-[radial-gradient(circle_at_top_left,_rgba(59,130,246,0.14),_transparent_28%),linear-gradient(135deg,_rgba(255,255,255,0.98),_rgba(248,250,252,1))] dark:bg-[radial-gradient(circle_at_top_left,_rgba(14,165,233,0.2),_transparent_30%),linear-gradient(135deg,_rgba(2,6,23,0.96),_rgba(15,23,42,1))]">

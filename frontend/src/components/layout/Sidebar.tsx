@@ -53,17 +53,21 @@ export function Sidebar({ isCollapsed, onToggle }: { isCollapsed: boolean; onTog
                   className={({ isActive }) =>
                     cn(
                       "group flex h-10 items-center gap-3 rounded-xl px-3 text-sm font-medium transition-all duration-200",
-                      isActive 
-                        ? "bg-primary/10 text-primary shadow-sm" 
+                      isActive
+                        ? "bg-primary/10 text-primary shadow-sm"
                         : "text-muted-foreground hover:bg-muted/50 hover:text-foreground",
                       isCollapsed && "justify-center px-0",
                     )
                   }
                 >
-                  <item.icon className={cn("h-4 w-4 transition-colors", isActive ? "text-primary" : "text-muted-foreground group-hover:text-foreground")} />
-                  {!isCollapsed ? (
-                    <span className="transition-colors">{item.label}</span>
-                  ) : null}
+                  {({ isActive }: { isActive: boolean }) => (
+                    <>
+                      <item.icon className={cn("h-4 w-4 transition-colors", isActive ? "text-primary" : "text-muted-foreground group-hover:text-foreground")} />
+                      {!isCollapsed ? (
+                        <span className="transition-colors">{item.label}</span>
+                      ) : null}
+                    </>
+                  )}
                 </NavLink>
               ))}
             </div>

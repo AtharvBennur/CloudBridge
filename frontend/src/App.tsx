@@ -12,6 +12,13 @@ import { MigrationEditPage } from "@/pages/MigrationEditPage";
 import { MigrationListPage } from "@/pages/MigrationListPage";
 import { NotFoundPage } from "@/pages/NotFoundPage";
 import { PreflightPage } from "@/pages/PreflightPage";
+import { CDCPage } from "@/pages/CDCPage";
+import { SchemaDriftPage } from "@/pages/SchemaDriftPage";
+import { ApprovalsPage } from "@/pages/ApprovalsPage";
+import { ECSPage } from "@/pages/ECSPage";
+import { ObservabilityPage } from "@/pages/ObservabilityPage";
+import { NotificationsPage } from "@/pages/NotificationsPage";
+import { RollbackPage } from "@/pages/RollbackPage";
 
 export function App() {
   return (
@@ -90,6 +97,13 @@ export function App() {
           }
         />
         <Route path="/preflight" element={<ProtectedRoute><AppShell><PreflightPage /></AppShell></ProtectedRoute>} />
+        <Route path="/cdc" element={<ProtectedRoute><AppShell><CDCPage /></AppShell></ProtectedRoute>} />
+        <Route path="/schema-drift" element={<ProtectedRoute><AppShell><SchemaDriftPage /></AppShell></ProtectedRoute>} />
+        <Route path="/approvals" element={<ProtectedRoute><AppShell><ApprovalsPage /></AppShell></ProtectedRoute>} />
+        <Route path="/ecs" element={<ProtectedRoute><AppShell><ECSPage /></AppShell></ProtectedRoute>} />
+        <Route path="/observability" element={<ProtectedRoute><AppShell><ObservabilityPage /></AppShell></ProtectedRoute>} />
+        <Route path="/notifications" element={<ProtectedRoute><AppShell><NotificationsPage /></AppShell></ProtectedRoute>} />
+        <Route path="/rollback" element={<ProtectedRoute><AppShell><RollbackPage /></AppShell></ProtectedRoute>} />
         <Route path="*" element={<NotFoundPage />} />
       </Routes>
     </BrowserRouter>

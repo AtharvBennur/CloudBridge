@@ -6,8 +6,57 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
+import { cdcService } from "@/services/cdcService";
 
 export function CDCPage() {
+  const cdcConfigsQuery = useQuery({
+    queryKey: ["cdc-configs"],
+    queryFn: () => cdcService.getConfig(1), // TODO: Get from route params
+  });
+
+  const cdcStatsQuery = useQuery({
+    queryKey: ["cdc-stats"],
+    queryFn: () => cdcService.getStatistics(1),
+    enabled: !!cdcConfigsQuery.data,
+  });
+
+  const cdcEventsQuery = useQuery({
+    queryKey: ["cdc-events"],
+    queryFn: () => cdcService.getEvents(1, undefined, 50),
+    enabled: !!cdcConfigsQuery.data,
+  });
+
+  const handleStart = async () => {
+    try {
+      await cdcService.start(1);
+      cdcConfigsQuery.refetch();
+    } catch (error) {
+      console.error("Failed to start CDC:", error);
+    }
+  };
+
+  const handlePause = async () => {
+    try {
+      await cdcService.pause(1);
+      cdcConfigsQuery.refetch();
+    } catch (error) {
+      console.error("Failed to pause CDC:", error);
+    }
+  };
+
+  const handleStop = async () => {
+    try {
+      await cdcService.stop(1);
+      cdcConfigsQuery.refetch();
+    } catch (error) {
+      console.error("Failed to stop CDC:", error);
+    }
+  };
+
+  const config = cdcConfigsQuery.data;
+  const stats = cdcStatsQuery.data;
+  const events = cdcEventsQuery.data || [];
+
   return (
     <div className="mx-auto max-w-7xl space-y-6">
       <motion.div
@@ -27,13 +76,17 @@ export function CDCPage() {
             </p>
           </div>
           <div className="flex gap-2">
-            <Button variant="outline" size="sm">
-              <Clock className="mr-2 h-4 w-4" />
-              Schedule
+            <Button variant="outline" size="sm" onClick={handlePause} disabled={!config || config.status !== "RUNNING"}>
+              <Pause className="mr-2 h-4 w-4" />
+              Pause
             </Button>
-            <Button size="sm">
+            <Button size="sm" onClick={handleStart} disabled={!config || config.status === "RUNNING"}>
               <Play className="mr-2 h-4 w-4" />
-              Start All
+              Start
+            </Button>
+            <Button variant="outline" size="sm" onClick={handleStop} disabled={!config || config.status === "IDLE"}>
+              <Square className="mr-2 h-4 w-4" />
+              Stop
             </Button>
           </div>
         </div>
@@ -46,27 +99,33 @@ export function CDCPage() {
             <CardDescription>Real-time CDC streaming metrics</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <div className="h-2 w-2 rounded-full bg-emerald-500" />
-                <span className="text-sm font-medium">Active Streams</span>
-              </div>
-              <span className="text-2xl font-semibold">3</span>
-            </div>
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <Activity className="h-4 w-4 text-muted-foreground" />
-                <span className="text-sm text-muted-foreground">Events/sec</span>
-              </div>
-              <span className="text-2xl font-semibold">1,247</span>
-            </div>
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <Clock className="h-4 w-4 text-muted-foreground" />
-                <span className="text-sm text-muted-foreground">Avg Lag</span>
-              </div>
-              <span className="text-2xl font-semibold text-emerald-600">0.3s</span>
-            </div>
+            {stats ? (
+              <>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <div className={`h-2 w-2 rounded-full ${config?.status === "RUNNING" ? "bg-emerald-500" : "bg-gray-500"}`} />
+                    <span className="text-sm font-medium">Status</span>
+                  </div>
+                  <Badge variant={config?.status === "RUNNING" ? "success" : "secondary"}>{config?.status || "IDLE"}</Badge>
+                </div>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Activity className="h-4 w-4 text-muted-foreground" />
+                    <span className="text-sm text-muted-foreground">Events/sec</span>
+                  </div>
+                  <span className="text-2xl font-semibold">{stats.events_per_second || 0}</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Clock className="h-4 w-4 text-muted-foreground" />
+                    <span className="text-sm text-muted-foreground">Avg Lag</span>
+                  </div>
+                  <span className="text-2xl font-semibold text-emerald-600">{stats.avg_lag_seconds?.toFixed(1) || 0}s</span>
+                </div>
+              </>
+            ) : (
+              <Skeleton className="h-20 w-full" />
+            )}
           </CardContent>
         </Card>
 
@@ -76,18 +135,24 @@ export function CDCPage() {
             <CardDescription>CDC change event statistics</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="flex items-center justify-between">
-              <span className="text-sm text-muted-foreground">Total Events</span>
-              <span className="text-2xl font-semibold">2.4M</span>
-            </div>
-            <div className="flex items-center justify-between">
-              <span className="text-sm text-muted-foreground">Processed</span>
-              <span className="text-2xl font-semibold text-emerald-600">2.3M</span>
-            </div>
-            <div className="flex items-center justify-between">
-              <span className="text-sm text-muted-foreground">Failed</span>
-              <span className="text-2xl font-semibold text-red-600">127</span>
-            </div>
+            {stats ? (
+              <>
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-muted-foreground">Total Events</span>
+                  <span className="text-2xl font-semibold">{stats.total_events || 0}</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-muted-foreground">Processed</span>
+                  <span className="text-2xl font-semibold text-emerald-600">{stats.processed_events || 0}</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-muted-foreground">Failed</span>
+                  <span className="text-2xl font-semibold text-red-600">{stats.failed_events || 0}</span>
+                </div>
+              </>
+            ) : (
+              <Skeleton className="h-20 w-full" />
+            )}
           </CardContent>
         </Card>
 
@@ -100,17 +165,17 @@ export function CDCPage() {
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <Database className="h-4 w-4 text-muted-foreground" />
-                <span className="text-sm text-muted-foreground">Active Slots</span>
+                <span className="text-sm text-muted-foreground">Replication Slot</span>
               </div>
-              <span className="text-2xl font-semibold">3</span>
+              <span className="text-sm font-medium">{config?.replication_slot_name || "N/A"}</span>
             </div>
             <div className="flex items-center justify-between">
-              <span className="text-sm text-muted-foreground">WAL Retention</span>
-              <span className="text-2xl font-semibold">24h</span>
+              <span className="text-sm text-muted-foreground">CDC Mode</span>
+              <span className="text-sm font-medium">{config?.cdc_mode || "N/A"}</span>
             </div>
             <div className="flex items-center justify-between">
-              <span className="text-sm text-muted-foreground">Disk Usage</span>
-              <span className="text-2xl font-semibold">12.4 GB</span>
+              <span className="text-sm text-muted-foreground">Max Lag</span>
+              <span className="text-sm font-medium">{config?.max_lag_seconds || 0}s</span>
             </div>
           </CardContent>
         </Card>
@@ -123,46 +188,39 @@ export function CDCPage() {
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
-            {[
-              { name: "Production to DR", status: "RUNNING", lag: "0.2s", events: "847/sec" },
-              { name: "Analytics to Warehouse", status: "RUNNING", lag: "0.5s", events: "312/sec" },
-              { name: "Legacy to Cloud", status: "PAUSED", lag: "N/A", events: "0/sec" },
-            ].map((stream, index) => (
+            {cdcEventsQuery.isLoading && (
+              <div className="space-y-2">
+                <Skeleton className="h-16 w-full" />
+                <Skeleton className="h-16 w-full" />
+                <Skeleton className="h-16 w-full" />
+              </div>
+            )}
+            {!cdcEventsQuery.isLoading && events.length === 0 && (
+              <div className="py-6 text-center text-sm text-muted-foreground border border-dashed rounded-xl">
+                No CDC events recorded yet. Start CDC replication to begin capturing changes.
+              </div>
+            )}
+            {!cdcEventsQuery.isLoading && events.slice(0, 5).map((event, index) => (
               <div key={index} className="flex items-center justify-between p-4 border border-border/70 rounded-2xl bg-background/50 hover:bg-muted/20 transition">
                 <div className="flex items-center gap-4">
-                  <div className="h-10 w-10 rounded-xl bg-primary/10 flex items-center justify-center">
-                    <Database className="h-5 w-5 text-primary" />
+                  <div className={`h-10 w-10 rounded-xl flex items-center justify-center ${
+                    event.event_type === "INSERT" ? "bg-emerald-500/10 text-emerald-600" :
+                    event.event_type === "UPDATE" ? "bg-blue-500/10 text-blue-600" :
+                    "bg-red-500/10 text-red-600"
+                  }`}>
+                    <Database className="h-5 w-5" />
                   </div>
                   <div>
-                    <h4 className="font-semibold">{stream.name}</h4>
-                    <p className="text-sm text-muted-foreground">PostgreSQL WAL streaming</p>
+                    <h4 className="font-semibold">{event.event_type}</h4>
+                    <p className="text-sm text-muted-foreground">Table: {event.table_name}</p>
                   </div>
                 </div>
-                <div className="flex items-center gap-6">
-                  <div className="text-right">
-                    <p className="text-xs text-muted-foreground">Lag</p>
-                    <p className="text-sm font-medium">{stream.lag}</p>
-                  </div>
-                  <div className="text-right">
-                    <p className="text-xs text-muted-foreground">Events</p>
-                    <p className="text-sm font-medium">{stream.events}</p>
-                  </div>
-                  <Badge variant={stream.status === "RUNNING" ? "success" : "warning"}>
-                    {stream.status}
+                <div className="flex items-center gap-4">
+                  <Badge variant={event.status === "PROCESSED" ? "success" : event.status === "FAILED" ? "destructive" : "secondary"}>
+                    {event.status}
                   </Badge>
-                  <div className="flex gap-2">
-                    {stream.status === "RUNNING" ? (
-                      <Button variant="ghost" size="icon">
-                        <Pause className="h-4 w-4" />
-                      </Button>
-                    ) : (
-                      <Button variant="ghost" size="icon">
-                        <Play className="h-4 w-4" />
-                      </Button>
-                    )}
-                    <Button variant="ghost" size="icon">
-                      <Square className="h-4 w-4" />
-                    </Button>
+                  <div className="text-xs text-muted-foreground">
+                    {new Date(event.created_at).toLocaleString()}
                   </div>
                 </div>
               </div>

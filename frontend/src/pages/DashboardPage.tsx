@@ -9,6 +9,7 @@ import { motion } from "framer-motion";
 import {
   Activity,
   ArrowUpRight,
+  Bot,
   CheckCircle2,
   Cloud,
   Database,
@@ -17,17 +18,24 @@ import {
   ShieldCheck,
   Workflow,
   Clock,
-  Sparkles
+  Sparkles,
+  Zap,
+  AlertTriangle
 } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
+import { StatCard } from "@/components/ui/StatCard";
+import { ProgressBar } from "@/components/ui/ProgressBar";
+import { ProgressRing } from "@/components/ui/ProgressRing";
 import { env } from "@/lib/env";
 import { getHealth } from "@/services/healthService";
 import { migrationService } from "@/services/migrationService";
 import { awsConnectionService } from "@/services/awsConnectionService";
 import { databaseConfigService } from "@/services/databaseConfigService";
+import { observabilityService } from "@/services/observabilityService";
 
 export function DashboardPage() {
   const healthQuery = useQuery({
@@ -50,6 +58,11 @@ export function DashboardPage() {
     queryFn: () => databaseConfigService.list(),
   });
 
+  const systemMetricsQuery = useQuery({
+    queryKey: ["system-metrics"],
+    queryFn: () => observabilityService.getSystemMetrics(),
+  });
+
   const apiStatus = healthQuery.data?.status === "healthy" ? "Healthy" : "Unavailable";
   
   const totalMigrations = migrationsQuery.data?.length || 0;
@@ -62,6 +75,15 @@ export function DashboardPage() {
   const totalDatabases = databasesQuery.data?.length || 0;
 
   const recentMigrations = migrationsQuery.data?.slice(0, 4) || [];
+  const systemMetrics = systemMetricsQuery.data;
+
+  // Calculate overall health score
+  const healthScore = systemMetrics ? Math.round(
+    ((systemMetrics.completed_migrations / Math.max(systemMetrics.total_migrations, 1)) * 40) +
+    ((systemMetrics.running_migrations > 0 ? 1 : 0) * 20) +
+    ((systemMetrics.failed_migrations === 0 ? 1 : 0) * 20) +
+    ((apiStatus === "Healthy" ? 1 : 0) * 20)
+  ) : 0;
 
   return (
     <div className="mx-auto max-w-7xl space-y-6">
@@ -137,40 +159,34 @@ export function DashboardPage() {
 
       {/* Statistics Cards */}
       <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        {[
-          { label: "Total Migrations", value: totalMigrations, change: `${runningMigrations} active, ${completedMigrations} completed`, icon: Database },
-          { label: "AWS Connections", value: totalAWSConns, change: `${activeAWSConns} accounts active`, icon: Cloud },
-          { label: "Registered Databases", value: totalDatabases, change: "Secrets stored in customer SM", icon: Server },
-          { label: "Failed runs", value: failedMigrations, change: failedMigrations > 0 ? "Review failed workers" : "All clean", icon: Activity },
-        ].map((item, index) => {
-          const Icon = item.icon;
-          return (
-            <motion.div
-              key={item.label}
-              initial={{ opacity: 0, y: 12 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.3, delay: index * 0.05 }}
-            >
-              <Card className="border-border/70 shadow-sm hover:border-primary/45 transition">
-                <CardContent className="pt-5">
-                  <div className="flex items-start justify-between">
-                    <div>
-                      <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">{item.label}</p>
-                      <p className="mt-2 text-3.5xl font-semibold tracking-tight">{item.value}</p>
-                    </div>
-                    <div className="rounded-xl bg-primary/10 p-2.5 text-primary">
-                      <Icon className="h-4.5 w-4.5" />
-                    </div>
-                  </div>
-                  <div className="mt-4 flex items-center gap-1.5 text-xs text-muted-foreground">
-                    <ArrowUpRight className="h-3.5 w-3.5 text-emerald-500" />
-                    {item.change}
-                  </div>
-                </CardContent>
-              </Card>
-            </motion.div>
-          );
-        })}
+        <StatCard
+          title="Total Migrations"
+          value={totalMigrations}
+          change={`${runningMigrations} active, ${completedMigrations} completed`}
+          icon={Database}
+          trend="up"
+        />
+        <StatCard
+          title="AWS Connections"
+          value={totalAWSConns}
+          change={`${activeAWSConns} accounts active`}
+          icon={Cloud}
+          trend="up"
+        />
+        <StatCard
+          title="Registered Databases"
+          value={totalDatabases}
+          change="Secrets stored in customer SM"
+          icon={Server}
+          trend="neutral"
+        />
+        <StatCard
+          title="Failed Runs"
+          value={failedMigrations}
+          change={failedMigrations > 0 ? "Review failed workers" : "All clean"}
+          icon={Activity}
+          trend={failedMigrations > 0 ? "down" : "neutral"}
+        />
       </section>
 
       {/* Main content grid */}
@@ -178,8 +194,15 @@ export function DashboardPage() {
         {/* Recent Migrations Card */}
         <Card className="border-border/70 shadow-soft">
           <CardHeader>
-            <CardTitle>Recent Migrations</CardTitle>
-            <CardDescription>Recently registered database migration tasks.</CardDescription>
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle>Recent Migrations</CardTitle>
+                <CardDescription>Recently registered database migration tasks.</CardDescription>
+              </div>
+              <Button variant="outline" size="sm">
+                View All
+              </Button>
+            </div>
           </CardHeader>
           <CardContent className="space-y-3">
             {migrationsQuery.isLoading && (
@@ -199,11 +222,14 @@ export function DashboardPage() {
                   <div className="rounded-xl bg-primary/10 p-2.5 text-primary">
                     <Workflow className="h-4 w-4" />
                   </div>
-                  <div>
+                  <div className="flex-1">
                     <h4 className="font-semibold text-sm text-foreground">{migration.job_name}</h4>
                     <p className="text-xs text-muted-foreground mt-0.5">
                       Source: {migration.source_database} → Target: {migration.destination_database}
                     </p>
+                    {migration.status === "RUNNING" && (
+                      <ProgressBar value={65} max={100} size="sm" className="mt-2" showLabel={false} />
+                    )}
                   </div>
                 </div>
                 <div className="flex items-center gap-3">
@@ -216,40 +242,49 @@ export function DashboardPage() {
           </CardContent>
         </Card>
 
-        {/* Onboarding Overview Card */}
+        {/* System Health Card */}
         <Card className="border-border/70 shadow-soft">
           <CardHeader>
-            <CardTitle>Onboarding Posture</CardTitle>
-            <CardDescription>Setup walkthrough status</CardDescription>
+            <CardTitle>System Health</CardTitle>
+            <CardDescription>Overall platform health score and metrics</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="flex items-start gap-3">
-              <div className="rounded-full bg-emerald-500/10 p-2 text-emerald-600 shrink-0">
-                <CheckCircle2 className="h-4 w-4" />
-              </div>
-              <div>
-                <h4 className="text-sm font-semibold">1. AWS IAM Onboarding</h4>
-                <p className="text-xs text-muted-foreground mt-0.5">AssumeRole trust policy is generated using the AWS Onboarding flow.</p>
-              </div>
+            <div className="flex items-center justify-center">
+              <ProgressRing progress={healthScore} size={140}>
+                <div className="text-center">
+                  <div className="text-3xl font-bold">{healthScore}%</div>
+                  <div className="text-xs text-muted-foreground">Health Score</div>
+                </div>
+              </ProgressRing>
             </div>
-
-            <div className="flex items-start gap-3">
-              <div className="rounded-full bg-emerald-500/10 p-2 text-emerald-600 shrink-0">
-                <CheckCircle2 className="h-4 w-4" />
+            <div className="grid grid-cols-2 gap-3">
+              <div className="flex items-center gap-2 p-3 rounded-xl bg-muted/30">
+                <Zap className="h-4 w-4 text-amber-500" />
+                <div>
+                  <div className="text-xs text-muted-foreground">Active</div>
+                  <div className="font-semibold">{systemMetrics?.running_migrations || 0}</div>
+                </div>
               </div>
-              <div>
-                <h4 className="text-sm font-semibold">2. Credentials Protection</h4>
-                <p className="text-xs text-muted-foreground mt-0.5">Passwords are written to AWS Secrets Manager using the assumed role dynamically.</p>
+              <div className="flex items-center gap-2 p-3 rounded-xl bg-muted/30">
+                <CheckCircle2 className="h-4 w-4 text-emerald-500" />
+                <div>
+                  <div className="text-xs text-muted-foreground">Completed</div>
+                  <div className="font-semibold">{systemMetrics?.completed_migrations || 0}</div>
+                </div>
               </div>
-            </div>
-
-            <div className="flex items-start gap-3">
-              <div className="rounded-full bg-primary/10 p-2 text-primary shrink-0">
-                <Clock className="h-4 w-4" />
+              <div className="flex items-center gap-2 p-3 rounded-xl bg-muted/30">
+                <AlertTriangle className="h-4 w-4 text-red-500" />
+                <div>
+                  <div className="text-xs text-muted-foreground">Failed</div>
+                  <div className="font-semibold">{systemMetrics?.failed_migrations || 0}</div>
+                </div>
               </div>
-              <div>
-                <h4 className="text-sm font-semibold">3. Run Pre-flight Checks</h4>
-                <p className="text-xs text-muted-foreground mt-0.5">Validate connectivity and access parameters before starting execution.</p>
+              <div className="flex items-center gap-2 p-3 rounded-xl bg-muted/30">
+                <Bot className="h-4 w-4 text-blue-500" />
+                <div>
+                  <div className="text-xs text-muted-foreground">ECS Tasks</div>
+                  <div className="font-semibold">{systemMetrics?.active_ecs_tasks || 0}</div>
+                </div>
               </div>
             </div>
           </CardContent>
