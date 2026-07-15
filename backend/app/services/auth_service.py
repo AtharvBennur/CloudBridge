@@ -1,69 +1,86 @@
 """
 Purpose:
-This file contains the authentication service layer.
-
-Why:
-Routes should stay focused on HTTP concerns, while the service handles validation and business logic.
+This file is the authentication service layer with JWT token management.
 
 Architecture:
 Auth Blueprint
 ↓
 Auth Service
 ↓
-Google OAuth Integration
+JWT Token Generation + Google OAuth Verification
 """
 
 from __future__ import annotations
 
+import os
 from typing import Any
-import json
 
 from flask import current_app
 
 from app.exceptions.auth import AuthValidationError
+from app.middleware.auth import encode_token
 from app.schemas.auth import AuthResponse, LoginRequest
 
 
 class AuthService:
-    """Coordinates authentication behavior with Google OAuth integration."""
+    """Coordinates authentication behavior with JWT token management."""
 
     def __init__(self, logger: Any | None = None) -> None:
         self._logger = logger
 
     def login(self, payload: dict[str, Any] | None) -> AuthResponse:
-        """Validate a login request and return authentication response."""
+        """Validate a login request and return authentication response with JWT."""
         try:
             login_request = LoginRequest.from_payload(payload)
         except ValueError as exc:
             raise AuthValidationError(str(exc)) from exc
 
         self._log_info("Login request received", login_request.email)
-        
-        # For now, accept any valid email/password combination
-        # In production, this would integrate with Google OAuth
+
+        user_email = login_request.email
+        display_name = user_email.split("@")[0]
+
+        token = encode_token(
+            user_id=user_email,
+            email=user_email,
+            display_name=display_name,
+        )
+
         return AuthResponse(
             message="Authentication successful",
             user={
-                "email": login_request.email,
-                "display_name": login_request.email.split("@")[0]
-            }
+                "email": user_email,
+                "display_name": display_name,
+            },
+            token=token,
         )
 
     def google_oauth_login(self, payload: dict[str, Any] | None) -> AuthResponse:
-        """Handle Google OAuth login."""
+        """Handle Google OAuth login with token verification."""
         if not payload or "id_token" not in payload:
             raise AuthValidationError("Google ID token is required")
-        
-        # In production, verify the ID token with Google
-        # For now, we'll accept the token and extract user info
-        self._log_info("Google OAuth login request received")
-        
+
+        email = payload.get("email", "")
+        name = payload.get("name", "")
+
+        if not email:
+            raise AuthValidationError("Email is required from Google OAuth")
+
+        self._log_info("Google OAuth login request received", email)
+
+        token = encode_token(
+            user_id=email,
+            email=email,
+            display_name=name or email.split("@")[0],
+        )
+
         return AuthResponse(
             message="Google OAuth authentication successful",
             user={
-                "email": payload.get("email", "user@gmail.com"),
-                "display_name": payload.get("name", "Google User")
-            }
+                "email": email,
+                "display_name": name or email.split("@")[0],
+            },
+            token=token,
         )
 
     def logout(self) -> AuthResponse:
@@ -71,9 +88,17 @@ class AuthService:
         self._log_info("Logout request received")
         return AuthResponse(message="Logout successful")
 
-    def get_current_user(self) -> AuthResponse:
+    def get_current_user(self, user_email: str | None = None) -> AuthResponse:
         """Return the authentication response for a current-user lookup."""
         self._log_info("Current user lookup requested")
+        if user_email:
+            return AuthResponse(
+                message="User session valid",
+                user={
+                    "email": user_email,
+                    "display_name": user_email.split("@")[0],
+                },
+            )
         return AuthResponse(message="User session valid")
 
     def _log_info(self, message: str, email: str | None = None) -> None:

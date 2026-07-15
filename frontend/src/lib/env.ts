@@ -20,6 +20,5 @@ export const env = {
   ui: {
     defaultTheme: import.meta.env.VITE_DEFAULT_THEME || "system",
     enableAnimations: import.meta.env.VITE_ENABLE_ANIMATIONS !== "false",
-    enableTelemetry: import.meta.env.VITE_ENABLE_TELEMETRY === "true",
   },
 };

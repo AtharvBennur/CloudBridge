@@ -21,6 +21,7 @@ import { NotificationsPage } from "@/pages/NotificationsPage";
 import { RollbackPage } from "@/pages/RollbackPage";
 import { AccountPage } from "@/pages/AccountPage";
 import { SettingsPage } from "@/pages/SettingsPage";
+import { HelpPage } from "@/pages/HelpPage";
 
 export function App() {
   return (
@@ -108,6 +109,7 @@ export function App() {
         <Route path="/rollback" element={<ProtectedRoute><AppShell><RollbackPage /></AppShell></ProtectedRoute>} />
         <Route path="/account" element={<ProtectedRoute><AppShell><AccountPage /></AppShell></ProtectedRoute>} />
         <Route path="/settings" element={<ProtectedRoute><AppShell><SettingsPage /></AppShell></ProtectedRoute>} />
+        <Route path="/help" element={<ProtectedRoute><AppShell><HelpPage /></AppShell></ProtectedRoute>} />
         <Route path="*" element={<NotFoundPage />} />
       </Routes>
     </BrowserRouter>

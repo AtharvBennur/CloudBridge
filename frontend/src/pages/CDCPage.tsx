@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { motion } from "framer-motion";
 import { Play, Pause, Square, Clock, Database, Activity, Zap, AlertTriangle } from "lucide-react";
@@ -7,28 +8,38 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cdcService } from "@/services/cdcService";
+import { migrationService } from "@/services/migrationService";
 
 export function CDCPage() {
+  const [selectedMigrationId, setSelectedMigrationId] = useState<number | null>(null);
+
+  const migrationsQuery = useQuery({
+    queryKey: ["migrations-list"],
+    queryFn: () => migrationService.list(),
+  });
+
   const cdcConfigsQuery = useQuery({
-    queryKey: ["cdc-configs"],
-    queryFn: () => cdcService.getConfig(1), // TODO: Get from route params
+    queryKey: ["cdc-configs", selectedMigrationId],
+    queryFn: () => cdcService.getConfig(selectedMigrationId!),
+    enabled: !!selectedMigrationId,
   });
 
   const cdcStatsQuery = useQuery({
-    queryKey: ["cdc-stats"],
-    queryFn: () => cdcService.getStatistics(1),
-    enabled: !!cdcConfigsQuery.data,
+    queryKey: ["cdc-stats", selectedMigrationId],
+    queryFn: () => cdcService.getStatistics(selectedMigrationId!),
+    enabled: !!selectedMigrationId && !!cdcConfigsQuery.data,
   });
 
   const cdcEventsQuery = useQuery({
-    queryKey: ["cdc-events"],
-    queryFn: () => cdcService.getEvents(1, undefined, 50),
-    enabled: !!cdcConfigsQuery.data,
+    queryKey: ["cdc-events", selectedMigrationId],
+    queryFn: () => cdcService.getEvents(selectedMigrationId!, undefined, 50),
+    enabled: !!selectedMigrationId && !!cdcConfigsQuery.data,
   });
 
   const handleStart = async () => {
+    if (!selectedMigrationId) return;
     try {
-      await cdcService.start(1);
+      await cdcService.start(selectedMigrationId);
       cdcConfigsQuery.refetch();
     } catch (error) {
       console.error("Failed to start CDC:", error);
@@ -36,8 +47,9 @@ export function CDCPage() {
   };
 
   const handlePause = async () => {
+    if (!selectedMigrationId) return;
     try {
-      await cdcService.pause(1);
+      await cdcService.pause(selectedMigrationId);
       cdcConfigsQuery.refetch();
     } catch (error) {
       console.error("Failed to pause CDC:", error);
@@ -45,8 +57,9 @@ export function CDCPage() {
   };
 
   const handleStop = async () => {
+    if (!selectedMigrationId) return;
     try {
-      await cdcService.stop(1);
+      await cdcService.stop(selectedMigrationId);
       cdcConfigsQuery.refetch();
     } catch (error) {
       console.error("Failed to stop CDC:", error);
@@ -56,6 +69,8 @@ export function CDCPage() {
   const config = cdcConfigsQuery.data;
   const stats = cdcStatsQuery.data;
   const events = cdcEventsQuery.data || [];
+
+  const migrations = migrationsQuery.data || [];
 
   return (
     <div className="mx-auto max-w-7xl space-y-6">
@@ -74,6 +89,20 @@ export function CDCPage() {
             <p className="mt-2 text-base text-muted-foreground">
               Real-time Change Data Capture with PostgreSQL WAL streaming and continuous replication.
             </p>
+            <div className="mt-4">
+              <label htmlFor="cdc-migration-select" className="text-sm font-medium text-muted-foreground mb-1 block">Select Migration</label>
+              <select
+                id="cdc-migration-select"
+                className="h-10 w-full max-w-xs rounded-xl border border-border/70 bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-primary/20"
+                value={selectedMigrationId ?? ""}
+                onChange={(e) => setSelectedMigrationId(Number(e.target.value) || null)}
+              >
+                <option value="">Choose a migration...</option>
+                {migrations.map((m) => (
+                  <option key={m.id} value={m.id}>{m.job_name}</option>
+                ))}
+              </select>
+            </div>
           </div>
           <div className="flex gap-2">
             <Button variant="outline" size="sm" onClick={handlePause} disabled={!config || config.status !== "RUNNING"}>

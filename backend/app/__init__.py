@@ -4,6 +4,7 @@ from app.config import get_config
 from app.errors import register_error_handlers
 from app.extensions import cors, db, socketio
 from app.logging import configure_logging
+from app.middleware import RequestMiddleware
 from app.models.aws_connection import AWSConnection
 from app.models.database_config import DatabaseConfig
 from app.models.migration import MigrationJob
@@ -37,6 +38,7 @@ def create_app(config_name: str | None = None) -> Flask:
 
     configure_logging(app)
     register_extensions(app)
+    register_middleware(app)
     register_blueprints(app)
     register_error_handlers(app)
     register_websocket_handlers(app)
@@ -51,6 +53,10 @@ def create_app(config_name: str | None = None) -> Flask:
 def register_extensions(app: Flask) -> None:
     db.init_app(app)
     cors.init_app(app, resources={r"/*": {"origins": app.config["CORS_ORIGINS"]}})
+
+
+def register_middleware(app: Flask) -> None:
+    RequestMiddleware(app)
 
 
 def register_blueprints(app: Flask) -> None:
@@ -72,9 +78,9 @@ def register_blueprints(app: Flask) -> None:
 
 def register_websocket_handlers(app: Flask) -> None:
     """Register WebSocket event handlers."""
-    socketio.init_app(app, cors_allowed_origins="*", async_mode="threading")
-    
-    # Register event handlers
+    cors_origins = app.config.get("CORS_ORIGINS", "*")
+    socketio.init_app(app, cors_allowed_origins=cors_origins, async_mode="threading")
+
     socketio.on("connect")(handle_connect)
     socketio.on("disconnect")(handle_disconnect)
     socketio.on("join_migration")(handle_join_migration)

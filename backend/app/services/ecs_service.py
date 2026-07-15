@@ -97,7 +97,7 @@ class ECSService:
             security_group_ids = json.loads(task.security_group_ids) if task.security_group_ids else []
 
             # Start ECS task
-            ecs_client = self._aws_client.get_boto3_client("ecs", credentials, aws_connection.aws_region)
+            ecs_client = self._aws_client.get_boto3_client("ecs", credentials=credentials, region=aws_connection.aws_region)
             response = ecs_client.run_task(
                 cluster=task.cluster_arn,
                 taskDefinition=task.task_definition_arn,
@@ -150,7 +150,7 @@ class ECSService:
                 aws_connection.aws_region,
             )
 
-            ecs_client = self._aws_client.get_boto3_client("ecs", credentials, aws_connection.aws_region)
+            ecs_client = self._aws_client.get_boto3_client("ecs", credentials=credentials, region=aws_connection.aws_region)
             ecs_client.stop_task(
                 cluster=task.cluster_arn,
                 task=task.task_arn,
@@ -186,7 +186,7 @@ class ECSService:
                 aws_connection.aws_region,
             )
 
-            ecs_client = self._aws_client.get_boto3_client("ecs", credentials, aws_connection.aws_region)
+            ecs_client = self._aws_client.get_boto3_client("ecs", credentials=credentials, region=aws_connection.aws_region)
             response = ecs_client.describe_tasks(
                 cluster=task.cluster_arn,
                 tasks=[task.task_arn],
@@ -234,7 +234,7 @@ class ECSService:
                 aws_connection.aws_region,
             )
 
-            logs_client = self._aws_client.get_boto3_client("logs", credentials, aws_connection.aws_region)
+            logs_client = self._aws_client.get_boto3_client("logs", credentials=credentials, region=aws_connection.aws_region)
             
             # Get log stream name if not set
             if not task.log_stream_name:

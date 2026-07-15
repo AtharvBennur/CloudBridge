@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { motion } from "framer-motion";
 import { Activity, Play, Pause, Square, Server, Clock, CheckCircle2, AlertTriangle } from "lucide-react";
@@ -7,11 +8,20 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ecsService } from "@/services/ecsService";
+import { migrationService } from "@/services/migrationService";
 
 export function ECSPage() {
+  const [selectedMigrationId, setSelectedMigrationId] = useState<number | null>(null);
+
+  const migrationsQuery = useQuery({
+    queryKey: ["migrations-list"],
+    queryFn: () => migrationService.list(),
+  });
+
   const ecsTasksQuery = useQuery({
-    queryKey: ["ecs-tasks"],
-    queryFn: () => ecsService.listTasks(1), // TODO: Get from route params
+    queryKey: ["ecs-tasks", selectedMigrationId],
+    queryFn: () => ecsService.listTasks(selectedMigrationId!),
+    enabled: !!selectedMigrationId,
   });
 
   const handleStart = async (taskId: number) => {
@@ -46,6 +56,7 @@ export function ECSPage() {
   const pendingTasks = tasks.filter(t => t.status === "PENDING").length;
   const failedTasks = tasks.filter(t => t.status === "FAILED").length;
   const completedTasks = tasks.filter(t => t.status === "STOPPED").length;
+  const migrations = migrationsQuery.data || [];
 
   return (
     <div className="mx-auto max-w-7xl space-y-6">
@@ -64,6 +75,20 @@ export function ECSPage() {
             <p className="mt-2 text-base text-muted-foreground">
               Manage migration execution on AWS ECS/Fargate with cloud-based task orchestration.
             </p>
+            <div className="mt-4">
+              <label htmlFor="ecs-migration-select" className="text-sm font-medium text-muted-foreground mb-1 block">Select Migration</label>
+              <select
+                id="ecs-migration-select"
+                className="h-10 w-full max-w-xs rounded-xl border border-border/70 bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-primary/20"
+                value={selectedMigrationId ?? ""}
+                onChange={(e) => setSelectedMigrationId(Number(e.target.value) || null)}
+              >
+                <option value="">Choose a migration...</option>
+                {migrations.map((m) => (
+                  <option key={m.id} value={m.id}>{m.job_name}</option>
+                ))}
+              </select>
+            </div>
           </div>
           <div className="flex gap-2">
             <Button variant="outline" size="sm">

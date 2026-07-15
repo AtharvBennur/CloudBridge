@@ -10,6 +10,21 @@ export const apiClient = axios.create({
   },
 });
 
+apiClient.interceptors.request.use((config) => {
+  const stored = (() => {
+    try { return sessionStorage.getItem("cloudbridge_auth"); } catch { return null; }
+  })();
+  if (stored) {
+    try {
+      const data = JSON.parse(stored);
+      if (data.token) {
+        config.headers.Authorization = `Bearer ${data.token}`;
+      }
+    } catch {}
+  }
+  return config;
+});
+
 apiClient.interceptors.response.use(
   (response) => response,
   (error) => {

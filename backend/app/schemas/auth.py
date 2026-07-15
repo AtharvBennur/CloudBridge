@@ -2,9 +2,6 @@
 Purpose:
 This file defines the request and response objects used by the authentication API.
 
-Why:
-Schemas make the API contract explicit and keep validation logic readable.
-
 Architecture:
 Blueprints validate incoming JSON into schema objects.
 Services receive those objects and return response objects.
@@ -52,10 +49,13 @@ class AuthResponse:
 
     message: str
     user: dict[str, Any] | None = None
+    token: str | None = None
 
     def to_dict(self) -> dict[str, Any]:
         """Convert the response object into a JSON-safe dictionary."""
         result = {"message": self.message}
         if self.user:
             result["user"] = self.user
+        if self.token:
+            result["token"] = self.token
         return result

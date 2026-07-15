@@ -83,7 +83,7 @@ class ObservabilityService:
                 aws_connection.aws_region,
             )
 
-            cloudwatch_client = self._aws_client.get_boto3_client("cloudwatch", credentials, aws_connection.aws_region)
+            cloudwatch_client = self._aws_client.get_boto3_client("cloudwatch", credentials=credentials, region=aws_connection.aws_region)
             
             cloudwatch_client.put_metric_data(
                 Namespace=metric_namespace,
@@ -101,7 +101,7 @@ class ObservabilityService:
             self._log_info(f"CloudWatch metric sent: {metric_name} = {metric_value}")
 
         except ClientError as exc:
-            self._logger.error(f"Failed to send CloudWatch metric: {exc}")
+            self._log_error(f"Failed to send CloudWatch metric: {exc}")
             raise ObservabilityServiceError(f"Failed to send CloudWatch metric: {exc}") from exc
 
     def send_cloudwatch_log(
@@ -124,7 +124,7 @@ class ObservabilityService:
                 aws_connection.aws_region,
             )
 
-            logs_client = self._aws_client.get_boto3_client("logs", credentials, aws_connection.aws_region)
+            logs_client = self._aws_client.get_boto3_client("logs", credentials=credentials, region=aws_connection.aws_region)
             
             # Create log group if it doesn't exist
             try:
@@ -157,7 +157,7 @@ class ObservabilityService:
             self._log_info(f"CloudWatch log sent to {log_group_name}/{log_stream_name}")
 
         except ClientError as exc:
-            self._logger.error(f"Failed to send CloudWatch log: {exc}")
+            self._log_error(f"Failed to send CloudWatch log: {exc}")
             raise ObservabilityServiceError(f"Failed to send CloudWatch log: {exc}") from exc
 
     def get_migration_metrics(self, migration_id: int) -> dict[str, Any]:
@@ -294,5 +294,14 @@ class ObservabilityService:
 
     def _log_info(self, message: str) -> None:
         """Write a structured log entry."""
-        logger = self._logger or current_app.logger
-        logger.info(message)
+        if self._logger is not None:
+            self._logger.info(message)
+        else:
+            current_app.logger.info(message)
+
+    def _log_error(self, message: str) -> None:
+        """Write a structured error log entry."""
+        if self._logger is not None:
+            self._logger.error(message)
+        else:
+            current_app.logger.error(message)

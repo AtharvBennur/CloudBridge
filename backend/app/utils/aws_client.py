@@ -135,6 +135,9 @@ class AWSClient:
             "credentials_expires_at": credentials.get("Expiration").isoformat() if hasattr(credentials.get("Expiration"), "isoformat") else credentials.get("Expiration"),
         }
 
+    def get_boto3_client(self, service_name: str, credentials: dict[str, Any] | None = None, region: str | None = None):
+        return self._get_client(service_name, region=region, credentials=credentials)
+
     def _get_client(self, service_name: str, region: str | None = None, credentials: dict[str, Any] | None = None):
         region_name = region or self._default_region()
         if credentials is None:
@@ -152,12 +155,14 @@ class AWSClient:
         access_key_id = os.getenv("AWS_ACCESS_KEY_ID", "").strip()
         secret_access_key = os.getenv("AWS_SECRET_ACCESS_KEY", "").strip()
         if not access_key_id or not secret_access_key:
-            return {
+            fallback = {
                 "AccessKeyId": "test-access-key",
                 "SecretAccessKey": "test-secret-key",
                 "SessionToken": "test-session-token",
                 "AccountId": os.getenv("CLOUDBRIDGE_AWS_ACCOUNT_ID", "123456789012"),
             }
+            self._log("Using simulated AWS credentials - no real AWS credentials configured")
+            return fallback
         return None
 
     @staticmethod

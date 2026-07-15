@@ -1,0 +1,11 @@
+.git
+.gitignore
+node_modules
+.env
+.env.*
+!.env.example
+dist
+.vite
+*.tsbuildinfo
+coverage
+README.md

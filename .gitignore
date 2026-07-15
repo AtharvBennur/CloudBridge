@@ -32,3 +32,11 @@ frontend/.env.*
 .DS_Store
 Thumbs.db
 *.log
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+*.orig

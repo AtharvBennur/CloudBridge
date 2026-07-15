@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { motion } from "framer-motion";
 import { GitCompare, AlertTriangle, CheckCircle2, Clock, Database, Plus, Camera } from "lucide-react";
@@ -7,11 +8,20 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { schemaDriftService } from "@/services/schemaDriftService";
+import { migrationService } from "@/services/migrationService";
 
 export function SchemaDriftPage() {
+  const [selectedMigrationId, setSelectedMigrationId] = useState<number | null>(null);
+
+  const migrationsQuery = useQuery({
+    queryKey: ["migrations-list"],
+    queryFn: () => migrationService.list(),
+  });
+
   const driftEventsQuery = useQuery({
-    queryKey: ["drift-events"],
-    queryFn: () => schemaDriftService.listDriftEvents(1), // TODO: Get from route params
+    queryKey: ["drift-events", selectedMigrationId],
+    queryFn: () => schemaDriftService.listDriftEvents(selectedMigrationId!),
+    enabled: !!selectedMigrationId,
   });
 
   const handleApprove = async (eventId: number) => {
@@ -46,6 +56,7 @@ export function SchemaDriftPage() {
   const pendingApproval = events.filter(e => e.status === "PENDING").length;
   const autoApplied = events.filter(e => e.status === "AUTO_APPLIED").length;
   const rejected = events.filter(e => e.status === "REJECTED").length;
+  const migrations = migrationsQuery.data || [];
 
   return (
     <div className="mx-auto max-w-7xl space-y-6">
@@ -64,6 +75,20 @@ export function SchemaDriftPage() {
             <p className="mt-2 text-base text-muted-foreground">
               Monitor and detect schema changes in real-time with automatic drift analysis and approval workflows.
             </p>
+            <div className="mt-4">
+              <label htmlFor="drift-migration-select" className="text-sm font-medium text-muted-foreground mb-1 block">Select Migration</label>
+              <select
+                id="drift-migration-select"
+                className="h-10 w-full max-w-xs rounded-xl border border-border/70 bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-primary/20"
+                value={selectedMigrationId ?? ""}
+                onChange={(e) => setSelectedMigrationId(Number(e.target.value) || null)}
+              >
+                <option value="">Choose a migration...</option>
+                {migrations.map((m) => (
+                  <option key={m.id} value={m.id}>{m.job_name}</option>
+                ))}
+              </select>
+            </div>
           </div>
           <div className="flex gap-2">
             <Button variant="outline" size="sm">

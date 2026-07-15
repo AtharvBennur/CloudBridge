@@ -3,7 +3,7 @@ Purpose:
 Premium enterprise login page with modern branding and animations.
 */
 
-import { FormEvent, useState } from "react";
+import { FormEvent, useMemo, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { ArrowRight, Cloud, LockKeyhole, Database, Shield, Zap, ChevronRight } from "lucide-react";
 import { Navigate, useLocation, useNavigate } from "react-router-dom";
@@ -14,7 +14,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useAuth } from "@/context/AuthContext";
-import { authService, type GoogleOAuthRequest } from "@/services/authService";
+import { authService } from "@/services/authService";
+import { env } from "@/lib/env";
 
 interface LocationState {
   from?: {
@@ -24,29 +25,21 @@ interface LocationState {
 
 // Floating particle component
 function FloatingParticle({ delay, duration, size }: { delay: number; duration: number; size: number }) {
+  const { startX, xDrift } = useMemo(
+    () => ({
+      startX: Math.random() * (typeof window !== "undefined" ? window.innerWidth : 1000),
+      xDrift: Math.random() * 100 - 50,
+    }),
+    [],
+  );
+
   return (
     <motion.div
       className="absolute rounded-full bg-primary/20 blur-sm"
-      style={{
-        width: size,
-        height: size,
-      }}
-      initial={{
-        x: Math.random() * window.innerWidth,
-        y: window.innerHeight + 100,
-        opacity: 0,
-      }}
-      animate={{
-        y: -100,
-        opacity: [0, 0.6, 0],
-        x: [0, Math.random() * 100 - 50],
-      }}
-      transition={{
-        duration,
-        delay,
-        repeat: Infinity,
-        repeatType: "loop",
-      }}
+      style={{ width: size, height: size }}
+      initial={{ x: startX, y: typeof window !== "undefined" ? window.innerHeight + 100 : 800, opacity: 0 }}
+      animate={{ y: -100, opacity: [0, 0.6, 0], x: [0, xDrift] }}
+      transition={{ duration, delay, repeat: Infinity, repeatType: "loop" }}
     />
   );
 }
@@ -93,22 +86,33 @@ export function LoginPage() {
     setIsSubmitting(true);
 
     try {
-      // For demo purposes, simulate Google OAuth
-      // In production, this would use the actual Google OAuth flow
-      const mockGoogleRequest: GoogleOAuthRequest = {
-        id_token: "mock_id_token",
-        email: "user@gmail.com",
-        name: "Google User"
-      };
+      if (!env.cognitoClientId) {
+        throw new Error("Google OAuth is not configured. Set VITE_COGNITO_CLIENT_ID in your environment.");
+      }
 
-      const response = await authService.googleOAuthLogin(mockGoogleRequest);
-      console.log("Google OAuth login successful:", response);
+      // Use the Google Identity Services library if available
+      const google = (window as any).google;
+      if (google?.accounts?.id) {
+        const credential = await new Promise<string>((resolve, reject) => {
+          google.accounts.id.initialize({
+            client_id: env.cognitoClientId,
+            callback: (response: any) => resolve(response.credential),
+            onerror: () => reject(new Error("Google sign-in was cancelled or failed.")),
+          });
+          google.accounts.id.prompt();
+        });
+
+        const response = await authService.googleOAuthLogin({ id_token: credential });
+        console.log("Google OAuth login successful:", response);
+      } else {
+        throw new Error("Google OAuth is not available. Ensure the Google Identity Services script is loaded.");
+      }
       navigate(redirectTo, { replace: true });
     } catch (loginError) {
       console.error("Google OAuth login error:", loginError);
       if (loginError instanceof Error) {
         if (loginError.message.includes("Network Error") || loginError.message.includes("fetch")) {
-          setError("Unable to connect to the server. Please ensure the backend is running at http://localhost:5000");
+          setError(`Unable to connect to the server. Please ensure the backend is running at ${env.apiBaseUrl}`);
         } else {
           setError(loginError.message);
         }
@@ -156,7 +160,7 @@ export function LoginPage() {
       ))}
 
       {/* Grid pattern overlay */}
-      <div className="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.02)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.02)_1px,transparent_1px)] bg-[size:64px_64px] dark:bg-[linear-gradient(rgba(255,255,255,0.02)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.02)_1px,transparent_1px)]" />
+      <div className="absolute inset-0 bg-[linear-gradient(rgba(128,128,128,0.05)_1px,transparent_1px),linear-gradient(90deg,rgba(128,128,128,0.05)_1px,transparent_1px)] bg-[size:64px_64px] dark:bg-[linear-gradient(rgba(255,255,255,0.02)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.02)_1px,transparent_1px)]" />
 
       <div className="absolute right-6 top-6 z-50">
         <ThemeToggle />
@@ -198,7 +202,7 @@ export function LoginPage() {
                 transition={{ delay: 0.3 }}
                 className="space-y-4"
               >
-                <h2 className="text-5xl font-bold leading-tight bg-gradient-to-r from-white via-white to-white/70 bg-clip-text text-transparent">
+                <h2 className="text-5xl font-bold leading-tight bg-gradient-to-r from-foreground via-foreground to-foreground/70 bg-clip-text text-transparent dark:from-white dark:via-white dark:to-white/70">
                   Migrate databases at scale
                 </h2>
                 <p className="text-xl text-muted-foreground leading-relaxed max-w-lg">
@@ -219,13 +223,13 @@ export function LoginPage() {
                     initial={{ opacity: 0, x: -20 }}
                     animate={{ opacity: 1, x: 0 }}
                     transition={{ delay: 0.5 + index * 0.1 }}
-                    className="flex items-start gap-4 p-4 rounded-2xl border border-white/10 bg-white/5 backdrop-blur-sm hover:bg-white/10 transition-colors group"
+                    className="flex items-start gap-4 p-4 rounded-2xl border border-border/10 bg-background/50 backdrop-blur-sm hover:bg-muted/50 transition-colors group dark:border-white/10 dark:bg-white/5 dark:hover:bg-white/10"
                   >
                     <div className="h-10 w-10 rounded-xl bg-primary/10 flex items-center justify-center text-primary group-hover:bg-primary/20 transition-colors">
                       <feature.icon className="h-5 w-5" />
                     </div>
                     <div>
-                      <h3 className="font-semibold text-white">{feature.title}</h3>
+                      <h3 className="font-semibold text-foreground dark:text-white">{feature.title}</h3>
                       <p className="text-sm text-muted-foreground">{feature.description}</p>
                     </div>
                   </motion.div>
@@ -347,7 +351,7 @@ export function LoginPage() {
                         <div className="w-full border-t border-border/10 dark:border-white/10" />
                       </div>
                       <div className="relative flex justify-center text-xs uppercase">
-                        <span className="bg-background px-2 text-muted-foreground dark:bg-[#0B0F17]">Or continue with</span>
+                        <span className="bg-card px-2 text-muted-foreground">Or continue with</span>
                       </div>
                     </div>
 

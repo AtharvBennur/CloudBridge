@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { motion } from "framer-motion";
 import { RotateCcw, Play, SkipBack, Trash2, AlertTriangle, CheckCircle2, Clock, Save } from "lucide-react";
@@ -7,22 +8,32 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { rollbackService } from "@/services/rollbackService";
+import { migrationService } from "@/services/migrationService";
 
 export function RollbackPage() {
+  const [selectedMigrationId, setSelectedMigrationId] = useState<number | null>(null);
+
+  const migrationsQuery = useQuery({
+    queryKey: ["migrations-list"],
+    queryFn: () => migrationService.list(),
+  });
+
   const checkpointsQuery = useQuery({
-    queryKey: ["checkpoints"],
-    queryFn: () => rollbackService.getCheckpoints(1), // TODO: Get from route params
+    queryKey: ["checkpoints", selectedMigrationId],
+    queryFn: () => rollbackService.getCheckpoints(selectedMigrationId!),
+    enabled: !!selectedMigrationId,
   });
 
   const recoveryOptionsQuery = useQuery({
-    queryKey: ["recovery-options"],
-    queryFn: () => rollbackService.getRecoveryOptions(1),
-    enabled: !!checkpointsQuery.data,
+    queryKey: ["recovery-options", selectedMigrationId],
+    queryFn: () => rollbackService.getRecoveryOptions(selectedMigrationId!),
+    enabled: !!selectedMigrationId && !!checkpointsQuery.data,
   });
 
   const handleRollback = async (checkpointId: number) => {
+    if (!selectedMigrationId) return;
     try {
-      await rollbackService.rollbackToCheckpoint(1, checkpointId);
+      await rollbackService.rollbackToCheckpoint(selectedMigrationId, checkpointId);
       checkpointsQuery.refetch();
       recoveryOptionsQuery.refetch();
     } catch (error) {
@@ -31,8 +42,9 @@ export function RollbackPage() {
   };
 
   const handleResume = async (checkpointId?: number) => {
+    if (!selectedMigrationId) return;
     try {
-      await rollbackService.resumeFromCheckpoint(1, checkpointId);
+      await rollbackService.resumeFromCheckpoint(selectedMigrationId, checkpointId);
       checkpointsQuery.refetch();
       recoveryOptionsQuery.refetch();
     } catch (error) {
@@ -41,8 +53,9 @@ export function RollbackPage() {
   };
 
   const handleRestart = async () => {
+    if (!selectedMigrationId) return;
     try {
-      await rollbackService.restartMigration(1);
+      await rollbackService.restartMigration(selectedMigrationId);
       checkpointsQuery.refetch();
       recoveryOptionsQuery.refetch();
     } catch (error) {
@@ -51,9 +64,10 @@ export function RollbackPage() {
   };
 
   const handleCreateCheckpoint = async () => {
+    if (!selectedMigrationId) return;
     try {
       await rollbackService.createCheckpoint({
-        migration_id: 1,
+        migration_id: selectedMigrationId,
         checkpoint_name: `Manual checkpoint ${new Date().toLocaleString()}`,
       });
       checkpointsQuery.refetch();
@@ -73,6 +87,7 @@ export function RollbackPage() {
 
   const checkpoints = checkpointsQuery.data || [];
   const recoveryOptions = recoveryOptionsQuery.data;
+  const migrations = migrationsQuery.data || [];
 
   return (
     <div className="mx-auto max-w-7xl space-y-6">
@@ -91,13 +106,27 @@ export function RollbackPage() {
             <p className="mt-2 text-base text-muted-foreground">
               Manage checkpoints and perform recovery operations for failed or interrupted migrations.
             </p>
+            <div className="mt-4">
+              <label htmlFor="rollback-migration-select" className="text-sm font-medium text-muted-foreground mb-1 block">Select Migration</label>
+              <select
+                id="rollback-migration-select"
+                className="h-10 w-full max-w-xs rounded-xl border border-border/70 bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-primary/20"
+                value={selectedMigrationId ?? ""}
+                onChange={(e) => setSelectedMigrationId(Number(e.target.value) || null)}
+              >
+                <option value="">Choose a migration...</option>
+                {migrations.map((m) => (
+                  <option key={m.id} value={m.id}>{m.job_name}</option>
+                ))}
+              </select>
+            </div>
           </div>
           <div className="flex gap-2">
-            <Button variant="outline" size="sm" onClick={handleCreateCheckpoint}>
+            <Button variant="outline" size="sm" onClick={handleCreateCheckpoint} disabled={!selectedMigrationId}>
               <Save className="mr-2 h-4 w-4" />
               Create Checkpoint
             </Button>
-            <Button variant="outline" size="sm" onClick={handleRestart}>
+            <Button variant="outline" size="sm" onClick={handleRestart} disabled={!selectedMigrationId}>
               <SkipBack className="mr-2 h-4 w-4" />
               Restart Migration
             </Button>

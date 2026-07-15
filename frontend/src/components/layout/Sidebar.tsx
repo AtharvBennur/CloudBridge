@@ -1,4 +1,5 @@
-import { ChevronLeft, ChevronRight, ClipboardCheck, Cloud, Database, LayoutDashboard, Server, Activity, GitCompare, Settings, ShieldCheck, Zap, BarChart3, RotateCcw } from "lucide-react";
+import { ChevronLeft, ChevronRight, ClipboardCheck, Cloud, Database, LayoutDashboard, Server, Activity, GitCompare, Settings, ShieldCheck, Zap, BarChart3, RotateCcw, User, HelpCircle } from "lucide-react";
+import { useEffect, type ReactNode } from "react";
 import { NavLink } from "react-router-dom";
 
 import { Button } from "@/components/ui/button";
@@ -18,74 +19,151 @@ const navigationItems = [
   { label: "Observability", href: "/observability", icon: BarChart3, category: "Monitoring" },
 ];
 
-export function Sidebar({ isCollapsed, onToggle }: { isCollapsed: boolean; onToggle: (value: boolean) => void }) {
-  const categories = Array.from(new Set(navigationItems.map(item => item.category)));
+const secondaryNavItems = [
+  { label: "Account", href: "/account", icon: User },
+  { label: "Settings", href: "/settings", icon: Settings },
+];
+
+interface SidebarProps {
+  isCollapsed: boolean;
+  onToggle: (value: boolean) => void;
+  isMobileOpen?: boolean;
+  onMobileClose?: () => void;
+}
+
+function SidebarContent({ isCollapsed, onToggle }: { isCollapsed: boolean; onToggle: (value: boolean) => void }) {
+  const categories = Array.from(new Set(navigationItems.map((item) => item.category)));
 
   return (
-    <aside className={cn("hidden shrink-0 border-r border-border/70 bg-gradient-to-b from-card/95 to-card/50 backdrop-blur-xl lg:flex", isCollapsed ? "w-20" : "w-72")}> 
-      <div className="flex w-full flex-col px-4 py-6">
-        <div className={cn("mb-8 flex items-center gap-3", isCollapsed && "justify-center")}> 
-          <div className="relative">
-            <div className="absolute inset-0 rounded-2xl bg-gradient-to-br from-primary to-blue-500 blur-lg opacity-50" />
-            <div className="relative grid h-11 w-11 place-items-center rounded-2xl bg-gradient-to-br from-primary to-blue-500 text-white shadow-xl shadow-primary/20">
-              <Cloud className="h-5 w-5" />
-            </div>
+    <div className="flex w-full flex-col px-4 py-6 h-full">
+      <div className={cn("mb-8 flex items-center gap-3", isCollapsed && "justify-center")}>
+        <div className="relative">
+          <div className="absolute inset-0 rounded-2xl bg-gradient-to-br from-primary to-blue-500 blur-lg opacity-50" />
+          <div className="relative grid h-11 w-11 place-items-center rounded-2xl bg-gradient-to-br from-primary to-blue-500 text-white shadow-xl shadow-primary/20">
+            <Cloud className="h-5 w-5" />
           </div>
-          {!isCollapsed ? (
-            <div>
-              <p className="text-base font-semibold tracking-tight">CloudBridge</p>
-              <p className="text-xs text-muted-foreground font-medium">Enterprise Migration</p>
-            </div>
-          ) : null}
         </div>
+        {!isCollapsed ? (
+          <div>
+            <p className="text-base font-semibold tracking-tight">CloudBridge</p>
+            <p className="text-xs text-muted-foreground font-medium">Enterprise Migration</p>
+          </div>
+        ) : null}
+      </div>
 
-        <nav className="flex-1 space-y-6 overflow-y-auto">
-          {categories.map((category) => (
-            <div key={category} className="space-y-2">
-              {!isCollapsed && (
-                <p className="px-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-                  {category}
-                </p>
-              )}
-              {navigationItems.filter(item => item.category === category).map((item) => (
+      <nav className="flex-1 space-y-6 overflow-y-auto">
+        {categories.map((category) => (
+          <div key={category} className="space-y-2">
+            {!isCollapsed && (
+              <p className="px-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">{category}</p>
+            )}
+            {navigationItems
+              .filter((item) => item.category === category)
+              .map((item) => (
                 <NavLink
                   key={item.label}
                   to={item.href}
                   className={({ isActive }) =>
                     cn(
                       "group flex h-10 items-center gap-3 rounded-xl px-3 text-sm font-medium transition-all duration-200",
-                      isActive
-                        ? "bg-primary/10 text-primary shadow-sm"
-                        : "text-muted-foreground hover:bg-muted/50 hover:text-foreground",
+                      isActive ? "bg-primary/10 text-primary shadow-sm" : "text-muted-foreground hover:bg-muted/50 hover:text-foreground",
                       isCollapsed && "justify-center px-0",
                     )
                   }
                 >
                   {({ isActive }: { isActive: boolean }) => (
                     <>
-                      <item.icon className={cn("h-4 w-4 transition-colors", isActive ? "text-primary" : "text-muted-foreground group-hover:text-foreground")} />
-                      {!isCollapsed ? (
-                        <span className="transition-colors">{item.label}</span>
-                      ) : null}
+                      <item.icon
+                        className={cn("h-4 w-4 transition-colors", isActive ? "text-primary" : "text-muted-foreground group-hover:text-foreground")}
+                      />
+                      {!isCollapsed ? <span className="transition-colors">{item.label}</span> : null}
                     </>
                   )}
                 </NavLink>
               ))}
-            </div>
-          ))}
-        </nav>
+          </div>
+        ))}
+      </nav>
 
-        <div className="mt-auto pt-6 border-t border-border/50">
-          <Button 
-            variant="ghost" 
-            size="icon" 
-            className="w-full justify-center hover:bg-muted/50" 
-            onClick={() => onToggle(!isCollapsed)}
+      <div className="mt-auto pt-4 border-t border-border/50 space-y-2">
+        {secondaryNavItems.map((item) => (
+          <NavLink
+            key={item.label}
+            to={item.href}
+            className={({ isActive }) =>
+              cn(
+                "group flex h-10 items-center gap-3 rounded-xl px-3 text-sm font-medium transition-all duration-200",
+                isActive ? "bg-primary/10 text-primary shadow-sm" : "text-muted-foreground hover:bg-muted/50 hover:text-foreground",
+                isCollapsed && "justify-center px-0",
+              )
+            }
           >
-            {isCollapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
-          </Button>
-        </div>
+            {({ isActive }: { isActive: boolean }) => (
+              <>
+                <item.icon className={cn("h-4 w-4 transition-colors", isActive ? "text-primary" : "text-muted-foreground group-hover:text-foreground")} />
+                {!isCollapsed ? <span className="transition-colors">{item.label}</span> : null}
+              </>
+            )}
+          </NavLink>
+        ))}
+        <a
+          href="https://docs.cloudbridge.io/help"
+          target="_blank"
+          rel="noopener noreferrer"
+          className={cn(
+            "group flex h-10 items-center gap-3 rounded-xl px-3 text-sm font-medium transition-all duration-200 text-muted-foreground hover:bg-muted/50 hover:text-foreground",
+            isCollapsed && "justify-center px-0",
+          )}
+        >
+          <HelpCircle className="h-4 w-4 text-muted-foreground group-hover:text-foreground" />
+          {!isCollapsed ? <span className="transition-colors">Help</span> : null}
+        </a>
+        <Button
+          variant="ghost"
+          size="icon"
+          className="w-full justify-center hover:bg-muted/50"
+          onClick={() => onToggle(!isCollapsed)}
+        >
+          {isCollapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
+        </Button>
       </div>
-    </aside>
+    </div>
+  );
+}
+
+export function Sidebar({ isCollapsed, onToggle, isMobileOpen, onMobileClose }: SidebarProps) {
+  useEffect(() => {
+    if (isMobileOpen) {
+      document.body.style.overflow = "hidden";
+    } else {
+      document.body.style.overflow = "";
+    }
+    return () => {
+      document.body.style.overflow = "";
+    };
+  }, [isMobileOpen]);
+
+  return (
+    <>
+      {/* Desktop sidebar */}
+      <aside
+        className={cn(
+          "hidden shrink-0 border-r border-border/70 bg-gradient-to-b from-card/95 to-card/50 backdrop-blur-xl lg:flex",
+          isCollapsed ? "w-20" : "w-72",
+        )}
+      >
+        <SidebarContent isCollapsed={isCollapsed} onToggle={onToggle} />
+      </aside>
+
+      {/* Mobile overlay */}
+      {isMobileOpen && (
+        <div className="fixed inset-0 z-40 lg:hidden">
+          <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={onMobileClose} />
+          <aside className="absolute inset-y-0 left-0 w-72 bg-gradient-to-b from-card to-card/95 backdrop-blur-xl border-r border-border/70 shadow-2xl animate-slide-in-left">
+            <SidebarContent isCollapsed={false} onToggle={() => onMobileClose?.()} />
+          </aside>
+        </div>
+      )}
+    </>
   );
 }

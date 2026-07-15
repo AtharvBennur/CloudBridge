@@ -81,7 +81,7 @@ class RollbackService:
 
         db.session.commit()
 
-        self._log_info(f"Migration {migration_id} rolled back to checkpoint {checkpoint_name}")
+        self._log_info(f"Migration {migration_id} rolled back to checkpoint {checkpoint.checkpoint_name}")
 
         return {
             "migration_id": migration_id,

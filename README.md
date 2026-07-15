@@ -1,388 +1,252 @@
 # CloudBridge
 
-Enterprise-grade database migration platform with CDC, schema drift detection, approval workflows, and rollback capabilities.
+**Enterprise Database Migration Platform**
 
-## Overview
+CloudBridge is a production-ready platform for orchestrating, monitoring, and managing database migrations across AWS environments. It provides a comprehensive solution for schema migration, change data capture (CDC), schema drift detection, approval workflows, and rollback management with a premium enterprise SaaS interface.
 
-CloudBridge is a production-ready full-stack platform for managing database migrations at scale. It provides:
-
-- **Change Data Capture (CDC)**: Real-time replication with PostgreSQL WAL streaming
-- **Schema Drift Detection**: Continuous monitoring and automatic drift detection
-- **Approval Workflow**: Pause on dangerous changes with manual approval
-- **ECS/Fargate Execution**: Scalable migration workers on AWS
-- **Observability**: CloudWatch metrics, audit logs, and system monitoring
-- **Notifications**: Email, Slack, and webhook integrations
-- **Rollback**: Checkpoint-based recovery with resume support
-- **Real-time Updates**: WebSocket-powered live dashboard
+---
 
 ## Architecture
 
-### Backend
-- **Framework**: Flask 3 with application factory pattern
-- **Database**: SQLAlchemy ORM with Alembic migrations
-- **Authentication**: Google OAuth (configurable)
-- **AWS Integration**: STS AssumeRole, Secrets Manager, ECS/Fargate, CloudWatch
-- **Real-time**: Flask-SocketIO for WebSocket communication
-- **Logging**: Structured logging with configurable levels
-
-### Frontend
-- **Framework**: React 19 + Vite + TypeScript
-- **Styling**: Tailwind CSS with shadcn/ui components
-- **State**: TanStack Query for data fetching
-- **Routing**: React Router with protected routes
-- **Animations**: Framer Motion for smooth transitions
-- **Real-time**: Socket.IO client for live updates
-
-## Prerequisites
-
-### System Requirements
-- **Python**: 3.11 or higher
-- **Node.js**: 18 or higher
-- **npm**: 9 or higher
-
-### AWS Prerequisites
-- AWS Account with appropriate IAM permissions
-- IAM user with programmatic access (for control plane)
-- ECS Cluster and Task Definition (for migration workers)
-- CloudWatch Log Group (for worker logs)
-
-### Required IAM Permissions
-
-The CloudBridge control plane IAM user requires:
-
-```json
-{
-  "Version": "2012-10-17",
-  "Statement": [
-    {
-      "Effect": "Allow",
-      "Action": [
-        "sts:AssumeRole",
-        "secretsmanager:CreateSecret",
-        "secretsmanager:GetSecretValue",
-        "secretsmanager:PutSecretValue",
-        "secretsmanager:DeleteSecret",
-        "secretsmanager:ListSecrets",
-        "ecs:RunTask",
-        "ecs:StopTask",
-        "ecs:DescribeTasks",
-        "ecs:ListTasks",
-        "logs:CreateLogGroup",
-        "logs:CreateLogStream",
-        "logs:PutLogEvents",
-        "cloudwatch:PutMetricData",
-        "cloudwatch:GetMetricStatistics"
-      ],
-      "Resource": "*"
-    }
-  ]
-}
+```
+┌─────────────────────────────────────────────────────────────┐
+│                        Frontend (React/TS)                   │
+│  Dashboard · Migrations · CDC · Schema Drift · Approvals   │
+│  ECS Tasks · Observability · Notifications · Rollback      │
+│  Account · Settings · Help                                  │
+├─────────────────────────────────────────────────────────────┤
+│                     API Gateway (Nginx)                      │
+├─────────────────────────────────────────────────────────────┤
+│                    Backend (Flask/Python)                     │
+│  Auth · Migrations · CDC · Schema · ECS · Observability    │
+│  Notifications · Rollback · Preflight · WebSocket           │
+├─────────────────────────────────────────────────────────────┤
+│                   Worker Layer (Threads/ECS)                 │
+│  Migration Workers · CDC Workers · Schema Workers           │
+├─────────────────────────────────────────────────────────────┤
+│                     AWS Integration Layer                     │
+│  STS AssumeRole · Secrets Manager · CloudFormation          │
+│  ECS Fargate · CloudWatch · Cognito                        │
+└─────────────────────────────────────────────────────────────┘
 ```
 
-Customer accounts require an IAM role with trust policy allowing CloudBridge to assume it.
+## Key Features
+
+- **Migration Lifecycle Management** — Create, start, pause, resume, cancel, and retry database migrations with checkpoint-based recovery
+- **Change Data Capture (CDC)** — Real-time replication monitoring with WAL-based change tracking
+- **Schema Drift Detection** — Automated schema comparison with approval workflows and rollback support
+- **AWS Account Integration** — STS AssumeRole across customer accounts with IAM validation
+- **ECS/Fargate Orchestration** — Managed container execution for migration workers
+- **Pre-flight Validation** — Automated connectivity, permissions, and configuration checks
+- **Approval Workflows** — Multi-level schema change approval with risk-based auto-approval
+- **Rollback & Recovery** — Checkpoint-based rollback with full migration restart capability
+- **Observability** — CloudWatch metrics, audit logging, system health monitoring
+- **Notification Center** — Multi-channel delivery (Email, Slack, Webhook) with filtering
+- **WebSocket Real-time Updates** — Live migration progress, worker status, and event notifications
+- **JWT Authentication** — Token-based auth with Google OAuth integration
+- **Theme Support** — Light, dark, and system-preference themes
+
+## Technology Stack
+
+| Layer | Technology |
+|-------|-----------|
+| Frontend | React 19, TypeScript, Vite 6, Tailwind CSS, TanStack Query |
+| Backend | Python 3.12, Flask 3.1, SQLAlchemy 2.0, Flask-SocketIO |
+| Database | PostgreSQL (production), SQLite (development) |
+| AWS | STS, Secrets Manager, CloudFormation, ECS/Fargate, CloudWatch |
+| Auth | JWT (PyJWT), Google OAuth, AWS Cognito |
+| Workers | Threading (local), ECS/Fargate (production) |
+| Real-time | WebSocket (Socket.IO) |
+| Deployment | Docker, Docker Compose, Nginx |
+
+## Folder Structure
+
+```
+cloudbridge/
+├── backend/
+│   ├── app/
+│   │   ├── exceptions/       # Domain-specific exceptions
+│   │   ├── middleware/        # Auth, request tracking middleware
+│   │   ├── models/           # SQLAlchemy ORM models
+│   │   ├── routes/           # Flask blueprints (15 modules)
+│   │   ├── schemas/          # Request/response validation
+│   │   ├── services/         # Business logic layer
+│   │   ├── utils/            # AWS client utilities
+│   │   ├── workers/          # Background migration workers
+│   │   ├── config.py         # Environment-based configuration
+│   │   ├── errors.py         # Global error handlers
+│   │   ├── extensions.py     # Flask extension instances
+│   │   └── logging.py        # Structured logging setup
+│   ├── migrations/           # Alembic database migrations
+│   ├── tests/                # 19 passing test cases
+│   ├── Dockerfile            # Multi-stage production build
+│   └── requirements.txt      # Python dependencies
+├── frontend/
+│   ├── src/
+│   │   ├── components/       # UI components (shadcn/ui-style)
+│   │   ├── context/          # Auth, Theme React contexts
+│   │   ├── lib/              # Utilities, env config
+│   │   ├── pages/            # 20 page components
+│   │   └── services/         # API client, all service modules
+│   ├── Dockerfile            # Multi-stage production build
+│   └── nginx.conf            # Production nginx config
+├── docs/                     # Complete specification documents
+├── docker-compose.yml        # Production-ready orchestration
+├── .env.example              # Configuration template
+└── README.md
+```
 
 ## Quick Start
 
-### 1. Clone Repository
+### Prerequisites
+
+- Python 3.12+
+- Node.js 22+
+- Docker & Docker Compose (optional)
+
+### 1. Clone & Setup
 
 ```bash
-git clone https://github.com/AtharvBennur/CloudBridge.git
-cd CloudBridge
+git clone https://github.com/your-org/cloudbridge.git
+cd cloudbridge
 ```
 
-### 2. Configure Environment
-
-**Backend:**
+### 2. Backend Setup
 
 ```bash
-cd backend
-copy .env.example .env
-```
-
-Edit `.env` and fill in your credentials:
-- `SECRET_KEY`: Generate with `openssl rand -hex 32`
-- `GOOGLE_OAUTH_CLIENT_ID`: Google OAuth Client ID from Google Cloud Console
-- `GOOGLE_OAUTH_CLIENT_SECRET`: Google OAuth Client Secret from Google Cloud Console
-- `AWS_ACCESS_KEY_ID`: Your AWS access key
-- `AWS_SECRET_ACCESS_KEY`: Your AWS secret key
-- `CLOUDBRIDGE_AWS_ACCOUNT_ID`: Your AWS account ID
-- `ECS_CLUSTER_NAME`: Your ECS cluster name
-- `ECS_TASK_DEFINITION`: Your ECS task definition
-- SMTP/Slack/Webhook credentials for notifications
-
-**Frontend:**
-
-```bash
-cd frontend
-copy .env.example .env
-```
-
-Edit `.env` and configure:
-- `VITE_API_BASE_URL`: Backend API URL (default: `http://localhost:5000`)
-- `VITE_GOOGLE_OAUTH_CLIENT_ID`: Google OAuth Client ID from Google Cloud Console
-
-### 3. Backend Setup
-
-```bash
+cp backend/.env.example backend/.env
+# Edit backend/.env with your configuration
 cd backend
 python -m venv .venv
-.\.venv\Scripts\Activate.ps1  # Windows
-# source .venv/bin/activate  # Linux/Mac
+# On Windows: .venv\Scripts\activate
+# On macOS/Linux: source .venv/bin/activate
 pip install -r requirements.txt
-python -m flask db upgrade  # Run database migrations
 python run.py
 ```
 
-Backend will start on `http://localhost:5000`
-
-### 4. Frontend Setup
+### 3. Frontend Setup
 
 ```bash
+cp frontend/.env.example frontend/.env
+# Edit frontend/.env with your configuration
 cd frontend
 npm install
 npm run dev
 ```
 
-Frontend will start on `http://localhost:5173`
-
-### 5. Verify Installation
+### 4. Docker Deployment
 
 ```bash
-# Backend health check
-Invoke-RestMethod http://localhost:5000/health
-
-# Should return: {"status": "healthy"}
+cp .env.example .env
+# Edit .env with your configuration
+docker compose up --build
 ```
 
-Open `http://localhost:5173` in your browser to access the CloudBridge dashboard.
+## AWS Setup
 
-## Project Structure
+### IAM Permissions
 
-```
-CloudBridge/
-├── backend/
-│   ├── app/
-│   │   ├── __init__.py          # Flask application factory
-│   │   ├── config.py            # Configuration management
-│   │   ├── extensions.py        # Flask extensions (DB, CORS, SocketIO)
-│   │   ├── models/              # SQLAlchemy models
-│   │   ├── schemas/             # Pydantic schemas for API
-│   │   ├── routes/              # API blueprints
-│   │   ├── services/            # Business logic layer
-│   │   ├── workers/             # Background workers
-│   │   ├── utils/               # Utility functions
-│   │   └── middleware/          # Custom middleware
-│   ├── migrations/              # Alembic migration files
-│   ├── tests/                   # Backend tests
-│   ├── requirements.txt         # Python dependencies
-│   ├── .env.example             # Environment template
-│   └── run.py                   # Application entry point
-├── frontend/
-│   ├── src/
-│   │   ├── components/          # React components
-│   │   │   ├── layout/          # Layout components (Sidebar, Navbar)
-│   │   │   ├── routing/         # Routing components
-│   │   │   └── ui/              # UI components (shadcn/ui)
-│   │   ├── pages/               # Page components
-│   │   ├── services/            # API service layer
-│   │   ├── lib/                 # Utility libraries
-│   │   └── App.tsx              # Main application component
-│   ├── public/                  # Static assets
-│   ├── package.json             # Node dependencies
-│   ├── .env.example             # Environment template
-│   └── vite.config.ts           # Vite configuration
-├── docker-compose.yml           # Docker orchestration
-└── README.md                    # This file
-```
+CloudBridge requires specific IAM permissions in your AWS account:
 
-## Database Migrations
+1. **Control Plane Account** (where CloudBridge runs):
+   - STS: `AssumeRole` to customer accounts
+   - CloudFormation: Create stacks for IAM roles
+   - ECS: Run Fargate tasks for migration workers
+   - CloudWatch: Create metrics and log groups
+   - Secrets Manager: Create secrets for database credentials
 
-### Create New Migration
+2. **Customer Account** (where databases reside):
+   - Create an IAM role with the CloudFormation template
+   - Establish trust with the CloudBridge control plane account
+   - Grant the role read access to source databases and write access to targets
+
+### Environment Variables
+
+Key environment variables (see `backend/.env.example` for complete list):
+
+| Variable | Required | Description |
+|----------|----------|-------------|
+| `SECRET_KEY` | Yes | Secret key for JWT signing |
+| `DATABASE_URL` | Yes | Backend database connection string |
+| `AWS_ACCESS_KEY_ID` | Yes | AWS access key for control plane |
+| `AWS_SECRET_ACCESS_KEY` | Yes | AWS secret key for control plane |
+| `CLOUDBRIDGE_AWS_ACCOUNT_ID` | Yes | AWS account ID for trust policy |
+| `CORS_ORIGINS` | Yes | Allowed frontend origins |
+| `GOOGLE_OAUTH_CLIENT_ID` | No | Google OAuth client ID |
+| `SMTP_HOST` | No | SMTP server for email notifications |
+| `SLACK_WEBHOOK_URL` | No | Slack webhook for notifications |
+
+## API Overview
+
+| Module | Prefix | Description |
+|--------|--------|-------------|
+| Auth | `/auth` | Login, logout, session validation, Google OAuth |
+| Health | `/health` | Health check with database connectivity |
+| Migrations | `/migrations` | Migration job CRUD and lifecycle |
+| Migration Engine | `/migration-engine` | Start, pause, resume, cancel, retry |
+| AWS Connections | `/aws-connections` | Account registration, STS AssumeRole |
+| Database Configs | `/database-configs` | Source/destination database onboarding |
+| Pre-flight | `/preflight` | Multi-step migration readiness validation |
+| CDC | `/cdc` | Change Data Capture configuration and events |
+| Schema Drift | `/schema-drift` | Schema snapshots and drift detection |
+| Schema Approval | `/schema-approval` | Approval workflow for schema changes |
+| ECS | `/ecs` | Fargate task lifecycle management |
+| Observability | `/observability` | Audit logs, metrics, system health |
+| Notifications | `/notifications` | Config management and delivery history |
+| Rollback | `/rollback` | Checkpoint-based rollback and recovery |
+| WebSocket | Socket.IO | Real-time migration and worker updates |
+
+## Testing
 
 ```bash
+# Backend tests
 cd backend
-python -m flask db migrate -m "description of changes"
-```
+python -m pytest tests/ -v
 
-### Apply Migrations
-
-```bash
-python -m flask db upgrade
-```
-
-### Rollback Migration
-
-```bash
-python -m flask db downgrade
-```
-
-## Running Tests
-
-### Backend Tests
-
-```bash
-cd backend
-pytest
-```
-
-### Frontend Tests
-
-```bash
-cd frontend
-npm test
-```
-
-## Deployment
-
-### Backend Deployment
-
-**Production Configuration:**
-
-1. Set `FLASK_ENV=production` in `.env`
-2. Use PostgreSQL instead of SQLite:
-   ```
-   DATABASE_URL=postgresql://user:password@host:port/database
-   ```
-3. Set a strong `SECRET_KEY`
-4. Disable debug mode: `FLASK_DEBUG=false`
-5. Use production WSGI server (Gunicorn):
-   ```bash
-   gunicorn -w 4 -b 0.0.0.0:5000 "app:create_app()"
-   ```
-
-**Docker Deployment:**
-
-```bash
-docker build -t cloudbridge-backend ./backend
-docker run -p 5000:5000 --env-file .env cloudbridge-backend
-```
-
-### Frontend Deployment
-
-**Production Build:**
-
-```bash
+# Frontend build verification
 cd frontend
 npm run build
 ```
 
-The build output will be in `frontend/dist/`. Serve with any static file server (Nginx, Apache, etc.).
+## Deployment
 
-**Docker Deployment:**
+### Production Checklist
 
-```bash
-docker build -t cloudbridge-frontend ./frontend
-docker run -p 5173:80 cloudbridge-frontend
-```
+- [ ] Set `FLASK_ENV=production`
+- [ ] Generate a strong `SECRET_KEY`: `python -c "import secrets; print(secrets.token_hex(32))"`
+- [ ] Configure PostgreSQL database
+- [ ] Set up AWS credentials with appropriate IAM permissions
+- [ ] Configure CORS origins for your frontend domain
+- [ ] Enable HTTPS with TLS certificate
+- [ ] Set up monitoring and alerting
+- [ ] Configure database backup strategy
+- [ ] Review and set resource limits in docker-compose.yml
 
-### Docker Compose
+## Developer Guide
 
-```bash
-docker-compose up -d
-```
+### Code Style
 
-## Feature Configuration
+- Backend: Follow PEP 8, use type hints, avoid wildcard imports
+- Frontend: ESLint + TypeScript strict mode
+- Services: Keep route handlers thin, delegate to service layer
+- Models: SQLAlchemy declarative with explicit column definitions
 
-### Enable/Disable Features
+### Adding a New Feature
 
-Features can be controlled via environment variables in `frontend/.env`:
-
-```bash
-VITE_FEATURE_CDC=true
-VITE_FEATURE_SCHEMA_DRIFT=true
-VITE_FEATURE_APPROVALS=true
-VITE_FEATURE_ECS=true
-VITE_FEATURE_OBSERVABILITY=true
-VITE_FEATURE_NOTIFICATIONS=true
-VITE_FEATURE_ROLLBACK=true
-```
-
-### WebSocket Configuration
-
-WebSocket URL is auto-derived from `VITE_API_BASE_URL`. Override with:
-
-```bash
-VITE_WS_BASE_URL=ws://your-backend-url
-```
-
-## Authentication
-
-### Google OAuth Setup
-
-CloudBridge uses Google OAuth for authentication. To set it up:
-
-1. Go to [Google Cloud Console](https://console.cloud.google.com/)
-2. Create a new project or select existing one
-3. Enable Google+ API
-4. Create OAuth 2.0 credentials:
-   - Application type: Web application
-   - Authorized redirect URIs: `http://localhost:5173` (or your production URL)
-5. Copy Client ID and Client Secret
-6. Add to backend `.env`:
-   - `GOOGLE_OAUTH_CLIENT_ID=your-client-id`
-   - `GOOGLE_OAUTH_CLIENT_SECRET=your-client-secret`
-7. Add to frontend `.env`:
-   - `VITE_GOOGLE_OAUTH_CLIENT_ID=your-client-id`
-
-### Local Authentication
-
-For development without Google OAuth, you can use the local authentication:
-- Email: any valid email address
-- Password: minimum 8 characters
-
-## Troubleshooting
-
-### Backend Issues
-
-**ModuleNotFoundError: No module named 'flask_socketio'**
-```bash
-pip install flask-socketio
-```
-
-**Database connection errors**
-- Verify `DATABASE_URL` in `.env`
-- Ensure database server is running
-- Check credentials
-
-**AWS authentication errors**
-- Verify AWS credentials in `.env`
-- Check IAM permissions
-- Ensure `CLOUDBRIDGE_AWS_ACCOUNT_ID` is correct
-
-**Google OAuth errors**
-- Verify Google OAuth credentials in `.env`
-- Check redirect URIs match in Google Cloud Console
-- Ensure OAuth consent screen is configured
-
-### Frontend Issues
-
-**Module not found errors**
-```bash
-npm install
-```
-
-**API connection errors**
-- Verify `VITE_API_BASE_URL` in `.env`
-- Ensure backend is running
-- Check CORS configuration
-
-**WebSocket connection errors**
-- Verify WebSocket URL
-- Check backend WebSocket configuration
-- Ensure no firewall blocking WebSocket connections
-
-**Dark/Light mode not working**
-- Check browser console for errors
-- Verify ThemeContext is properly initialized
-- Check localStorage for theme settings
-
-## Support
-
-For issues, questions, or contributions:
-- Open an issue on GitHub
-- Check existing documentation
-- Review configuration examples
+1. Define model in `backend/app/models/`
+2. Create schema in `backend/app/schemas/`
+3. Implement service in `backend/app/services/`
+4. Create routes in `backend/app/routes/`
+5. Add frontend service in `frontend/src/services/`
+6. Create page component in `frontend/src/pages/`
+7. Add route in `frontend/src/App.tsx`
+8. Add sidebar link in `frontend/src/components/layout/Sidebar.tsx`
+9. Register blueprint in `backend/app/__init__.py`
 
 ## License
 
-Proprietary - All rights reserved
+Proprietary - All rights reserved.
+
+---
+
+Built with CloudBridge — Enterprise Database Migration Platform

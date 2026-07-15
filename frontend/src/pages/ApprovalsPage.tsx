@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { motion } from "framer-motion";
 import { ShieldCheck, CheckCircle2, XCircle, Clock, AlertTriangle, FileText } from "lucide-react";
@@ -8,16 +9,26 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Skeleton } from "@/components/ui/skeleton";
 import { schemaDriftService } from "@/services/schemaDriftService";
 import { approvalService } from "@/services/approvalService";
+import { migrationService } from "@/services/migrationService";
 
 export function ApprovalsPage() {
+  const [selectedMigrationId, setSelectedMigrationId] = useState<number | null>(null);
+
+  const migrationsQuery = useQuery({
+    queryKey: ["migrations-list"],
+    queryFn: () => migrationService.list(),
+  });
+
   const driftEventsQuery = useQuery({
-    queryKey: ["drift-events-pending"],
-    queryFn: () => schemaDriftService.listDriftEvents(1, "PENDING"),
+    queryKey: ["drift-events-pending", selectedMigrationId],
+    queryFn: () => schemaDriftService.listDriftEvents(selectedMigrationId!, "PENDING"),
+    enabled: !!selectedMigrationId,
   });
 
   const approvalSummaryQuery = useQuery({
-    queryKey: ["approval-summary"],
-    queryFn: () => approvalService.getApprovalSummary(1),
+    queryKey: ["approval-summary", selectedMigrationId],
+    queryFn: () => approvalService.getApprovalSummary(selectedMigrationId!),
+    enabled: !!selectedMigrationId,
   });
 
   const handleApprove = async (eventId: number) => {
@@ -41,8 +52,9 @@ export function ApprovalsPage() {
   };
 
   const handleBulkApprove = async () => {
+    if (!selectedMigrationId) return;
     try {
-      await approvalService.bulkApprove(1, "MODERATE", "user");
+      await approvalService.bulkApprove(selectedMigrationId, "MODERATE", "user");
       driftEventsQuery.refetch();
       approvalSummaryQuery.refetch();
     } catch (error) {
@@ -51,8 +63,9 @@ export function ApprovalsPage() {
   };
 
   const handleAutoApply = async () => {
+    if (!selectedMigrationId) return;
     try {
-      await approvalService.autoApplySafe(1);
+      await approvalService.autoApplySafe(selectedMigrationId);
       driftEventsQuery.refetch();
       approvalSummaryQuery.refetch();
     } catch (error) {
@@ -62,6 +75,7 @@ export function ApprovalsPage() {
 
   const pendingEvents = driftEventsQuery.data || [];
   const summary = approvalSummaryQuery.data;
+  const migrations = migrationsQuery.data || [];
 
   return (
     <div className="mx-auto max-w-7xl space-y-6">
@@ -80,12 +94,26 @@ export function ApprovalsPage() {
             <p className="mt-2 text-base text-muted-foreground">
               Review and approve schema changes detected during migration. Safe changes are auto-applied.
             </p>
+            <div className="mt-4">
+              <label htmlFor="approval-migration-select" className="text-sm font-medium text-muted-foreground mb-1 block">Select Migration</label>
+              <select
+                id="approval-migration-select"
+                className="h-10 w-full max-w-xs rounded-xl border border-border/70 bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-primary/20"
+                value={selectedMigrationId ?? ""}
+                onChange={(e) => setSelectedMigrationId(Number(e.target.value) || null)}
+              >
+                <option value="">Choose a migration...</option>
+                {migrations.map((m) => (
+                  <option key={m.id} value={m.id}>{m.job_name}</option>
+                ))}
+              </select>
+            </div>
           </div>
           <div className="flex gap-2">
-            <Button variant="outline" size="sm" onClick={handleBulkApprove}>
+            <Button variant="outline" size="sm" onClick={handleBulkApprove} disabled={!selectedMigrationId}>
               Bulk Approve
             </Button>
-            <Button size="sm" onClick={handleAutoApply}>
+            <Button size="sm" onClick={handleAutoApply} disabled={!selectedMigrationId}>
               Auto-Apply Safe
             </Button>
           </div>

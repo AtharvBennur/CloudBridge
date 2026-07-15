@@ -19,9 +19,35 @@ export interface AuthUser {
 export interface AuthApiMessage {
   message: string;
   user?: AuthUser;
+  token?: string;
 }
 
-const SESSION_STORAGE_KEY = "cloudbridge.session";
+const STORAGE_KEY = "cloudbridge_auth";
+
+function getStoredAuth(): { user?: { email: string; displayName: string }; token?: string } | null {
+  try {
+    const d = sessionStorage.getItem(STORAGE_KEY);
+    return d ? JSON.parse(d) : null;
+  } catch {
+    return null;
+  }
+}
+
+function setStoredAuth(data: { user: { email: string; displayName: string }; token?: string }): void {
+  try {
+    sessionStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+  } catch {
+    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(data)); } catch {}
+  }
+}
+
+function clearStoredAuth(): void {
+  try {
+    sessionStorage.removeItem(STORAGE_KEY);
+  } catch {
+    try { localStorage.removeItem(STORAGE_KEY); } catch {}
+  }
+}
 
 function assertValidLoginRequest(request: LoginRequest): void {
   if (!request.email.includes("@")) {
@@ -43,20 +69,7 @@ export const authService = {
       displayName: request.email.split("@")[0],
     };
 
-    // Use a resilient storage accessor: prefer sessionStorage but fall back to localStorage
-    const storage = ((): Storage => {
-      try {
-        const s = window.sessionStorage;
-        const testKey = "__cloudbridge_test";
-        s.setItem(testKey, "1");
-        s.removeItem(testKey);
-        return s;
-      } catch {
-        return window.localStorage;
-      }
-    })();
-
-    storage.setItem(SESSION_STORAGE_KEY, JSON.stringify({ user, message: response.data.message }));
+    setStoredAuth({ user, token: response.data.token });
     return user;
   },
 
@@ -67,67 +80,38 @@ export const authService = {
       displayName: request.name || "Google User",
     };
 
-    const storage = ((): Storage => {
-      try {
-        const s = window.sessionStorage;
-        const testKey = "__cloudbridge_test";
-        s.setItem(testKey, "1");
-        s.removeItem(testKey);
-        return s;
-      } catch {
-        return window.localStorage;
-      }
-    })();
-
-    storage.setItem(SESSION_STORAGE_KEY, JSON.stringify({ user, message: response.data.message }));
+    setStoredAuth({ user, token: response.data.token });
     return user;
   },
 
   async logout(): Promise<void> {
-    await apiClient.post<AuthApiMessage>("/auth/logout");
-    const storage = ((): Storage => {
-      try {
-        const s = window.sessionStorage;
-        const testKey = "__cloudbridge_test";
-        s.setItem(testKey, "1");
-        s.removeItem(testKey);
-        return s;
-      } catch {
-        return window.localStorage;
-      }
-    })();
-
-    storage.removeItem(SESSION_STORAGE_KEY);
+    try {
+      await apiClient.post<AuthApiMessage>("/auth/logout");
+    } catch {
+      // Proceed with local logout even if the server call fails
+    }
+    clearStoredAuth();
   },
 
   async getCurrentUser(): Promise<AuthUser | null> {
+    const stored = getStoredAuth();
+    if (!stored?.token) {
+      return null;
+    }
+
     try {
       const response = await apiClient.get<AuthApiMessage>("/auth/me");
-      const storage = ((): Storage => {
-        try {
-          const s = window.sessionStorage;
-          const testKey = "__cloudbridge_test";
-          s.setItem(testKey, "1");
-          s.removeItem(testKey);
-          return s;
-        } catch {
-          return window.localStorage;
-        }
-      })();
-
-      const rawSession = storage.getItem(SESSION_STORAGE_KEY);
-      if (!rawSession) {
-        return null;
+      if (response.data.user) {
+        setStoredAuth({ user: response.data.user, token: response.data.token || stored.token });
+        return response.data.user;
       }
-
-      const session = JSON.parse(rawSession) as { user?: AuthUser; message?: string };
-      if (session.user) {
-        return session.user;
+      // Fallback: if API returns no user but we have a stored user, try that
+      if (stored.user) {
+        return stored.user as AuthUser;
       }
-
-      return response.data.message ? { email: "pending@example.com", displayName: "Pending" } : null;
+      return null;
     } catch {
-      window.sessionStorage.removeItem(SESSION_STORAGE_KEY);
+      clearStoredAuth();
       return null;
     }
   },

@@ -4,6 +4,7 @@ Premium Dashboard dashboard providing metrics for CloudBridge.
 Fetches real connection counts, database configs, and migration jobs.
 */
 
+import { useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { motion } from "framer-motion";
 import {
@@ -18,9 +19,8 @@ import {
   ShieldCheck,
   Workflow,
   Clock,
-  Sparkles,
   Zap,
-  AlertTriangle
+  AlertTriangle,
 } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
@@ -38,6 +38,8 @@ import { databaseConfigService } from "@/services/databaseConfigService";
 import { observabilityService } from "@/services/observabilityService";
 
 export function DashboardPage() {
+  const navigate = useNavigate();
+
   const healthQuery = useQuery({
     queryKey: ["health"],
     queryFn: getHealth,
@@ -77,7 +79,6 @@ export function DashboardPage() {
   const recentMigrations = migrationsQuery.data?.slice(0, 4) || [];
   const systemMetrics = systemMetricsQuery.data;
 
-  // Calculate overall health score
   const healthScore = systemMetrics ? Math.round(
     ((systemMetrics.completed_migrations / Math.max(systemMetrics.total_migrations, 1)) * 40) +
     ((systemMetrics.running_migrations > 0 ? 1 : 0) * 20) +
@@ -87,7 +88,6 @@ export function DashboardPage() {
 
   return (
     <div className="mx-auto max-w-7xl space-y-6">
-      {/* Top Banner section */}
       <motion.section
         initial={{ opacity: 0, y: 16 }}
         animate={{ opacity: 1, y: 0 }}
@@ -119,7 +119,6 @@ export function DashboardPage() {
           </div>
         </div>
 
-        {/* API Health Widget */}
         <Card className="overflow-hidden border-border/70 shadow-soft">
           <CardHeader className="bg-muted/30 pb-4">
             <div className="flex items-center justify-between">
@@ -156,7 +155,6 @@ export function DashboardPage() {
         </Card>
       </motion.section>
 
-      {/* Statistics Cards */}
       <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         <StatCard
           title="Total Migrations"
@@ -188,9 +186,7 @@ export function DashboardPage() {
         />
       </section>
 
-      {/* Main content grid */}
       <div className="grid gap-6 lg:grid-cols-[1.5fr_1fr]">
-        {/* Recent Migrations Card */}
         <Card className="border-border/70 shadow-soft">
           <CardHeader>
             <div className="flex items-center justify-between">
@@ -198,7 +194,7 @@ export function DashboardPage() {
                 <CardTitle>Recent Migrations</CardTitle>
                 <CardDescription>Recently registered database migration tasks.</CardDescription>
               </div>
-              <Button variant="outline" size="sm">
+              <Button variant="outline" size="sm" onClick={() => navigate("/migrations")}>
                 View All
               </Button>
             </div>
@@ -224,11 +220,8 @@ export function DashboardPage() {
                   <div className="flex-1">
                     <h4 className="font-semibold text-sm text-foreground">{migration.job_name}</h4>
                     <p className="text-xs text-muted-foreground mt-0.5">
-                      Source: {migration.source_database} → Target: {migration.destination_database}
+                      Source: {migration.source_database} &rarr; Target: {migration.destination_database}
                     </p>
-                    {migration.status === "RUNNING" && (
-                      <ProgressBar value={65} max={100} size="sm" className="mt-2" showLabel={false} />
-                    )}
                   </div>
                 </div>
                 <div className="flex items-center gap-3">
@@ -241,7 +234,6 @@ export function DashboardPage() {
           </CardContent>
         </Card>
 
-        {/* System Health Card */}
         <Card className="border-border/70 shadow-soft">
           <CardHeader>
             <CardTitle>System Health</CardTitle>
