@@ -64,7 +64,7 @@ export function LoginPage() {
 
   if (isLoading) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 text-white">
+      <div className="flex min-h-screen items-center justify-center bg-background text-foreground">
         <motion.div
           initial={{ opacity: 0, scale: 0.9 }}
           animate={{ opacity: 1, scale: 1 }}
@@ -100,11 +100,21 @@ export function LoginPage() {
         email: "user@gmail.com",
         name: "Google User"
       };
-      
-      await authService.googleOAuthLogin(mockGoogleRequest);
+
+      const response = await authService.googleOAuthLogin(mockGoogleRequest);
+      console.log("Google OAuth login successful:", response);
       navigate(redirectTo, { replace: true });
     } catch (loginError) {
-      setError(loginError instanceof Error ? loginError.message : "Google authentication failed. Please try again.");
+      console.error("Google OAuth login error:", loginError);
+      if (loginError instanceof Error) {
+        if (loginError.message.includes("Network Error") || loginError.message.includes("fetch")) {
+          setError("Unable to connect to the server. Please ensure the backend is running at http://localhost:5000");
+        } else {
+          setError(loginError.message);
+        }
+      } else {
+        setError("Google authentication failed. Please try again or use email/password login.");
+      }
     } finally {
       setIsSubmitting(false);
     }
@@ -132,7 +142,7 @@ export function LoginPage() {
   ];
 
   return (
-    <main className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 text-white relative overflow-hidden">
+    <main className="min-h-screen bg-gradient-to-br from-background via-background to-background text-foreground relative overflow-hidden dark:from-slate-950 dark:via-slate-900 dark:to-slate-950 dark:text-white">
       {/* Animated gradient background */}
       <div className="absolute inset-0">
         <div className="absolute top-0 left-1/4 w-96 h-96 bg-primary/20 rounded-full blur-[128px] animate-pulse" />
@@ -146,7 +156,7 @@ export function LoginPage() {
       ))}
 
       {/* Grid pattern overlay */}
-      <div className="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.02)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.02)_1px,transparent_1px)] bg-[size:64px_64px]" />
+      <div className="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.02)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.02)_1px,transparent_1px)] bg-[size:64px_64px] dark:bg-[linear-gradient(rgba(255,255,255,0.02)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.02)_1px,transparent_1px)]" />
 
       <div className="absolute right-6 top-6 z-50">
         <ThemeToggle />
@@ -237,7 +247,7 @@ export function LoginPage() {
               transition={{ delay: 0.2, duration: 0.4 }}
               className="w-full max-w-md"
             >
-              <Card className="border border-white/10 bg-white/[0.02] backdrop-blur-xl shadow-2xl relative overflow-hidden">
+              <Card className="border border-border/10 bg-card/50 backdrop-blur-xl shadow-2xl relative overflow-hidden dark:border-white/10 dark:bg-white/[0.02]">
                 {/* Animated gradient border */}
                 <div className="absolute inset-0 bg-gradient-to-br from-primary/20 via-transparent to-blue-500/20 opacity-0 hover:opacity-100 transition-opacity duration-500" />
                 
@@ -262,26 +272,26 @@ export function LoginPage() {
                       Sign in to access your CloudBridge console
                     </CardDescription>
                   </CardHeader>
-                  
+
                   <CardContent className="space-y-6">
                     <form className="space-y-5" onSubmit={handleSubmit}>
                       <div className="space-y-2">
-                        <Label htmlFor="email" className="text-white/80 text-sm font-medium">Email address</Label>
+                        <Label htmlFor="email" className="text-foreground/80 dark:text-white/80 text-sm font-medium">Email address</Label>
                         <Input
                           id="email"
                           type="email"
                           autoComplete="email"
-                          className="bg-white/5 border-white/10 text-white placeholder-white/30 focus:border-primary/50 focus:ring-primary/50 h-12"
+                          className="bg-muted/50 border-border text-foreground placeholder-muted-foreground focus:border-primary/50 focus:ring-primary/50 h-12 dark:bg-white/5 dark:border-white/10 dark:text-white dark:placeholder-white/30"
                           value={email}
                           onChange={(event) => setEmail(event.target.value)}
                           placeholder="you@company.com"
                           required
                         />
                       </div>
-                      
+
                       <div className="space-y-2">
                         <div className="flex items-center justify-between">
-                          <Label htmlFor="password" className="text-white/80 text-sm font-medium">Password</Label>
+                          <Label htmlFor="password" className="text-foreground/80 dark:text-white/80 text-sm font-medium">Password</Label>
                           <a href="#" className="text-sm text-primary hover:text-primary/80 transition-colors">
                             Forgot password?
                           </a>
@@ -290,7 +300,7 @@ export function LoginPage() {
                           id="password"
                           type="password"
                           autoComplete="current-password"
-                          className="bg-white/5 border-white/10 text-white placeholder-white/30 focus:border-primary/50 focus:ring-primary/50 h-12"
+                          className="bg-muted/50 border-border text-foreground placeholder-muted-foreground focus:border-primary/50 focus:ring-primary/50 h-12 dark:bg-white/5 dark:border-white/10 dark:text-white dark:placeholder-white/30"
                           value={password}
                           onChange={(event) => setPassword(event.target.value)}
                           placeholder="••••••••"
@@ -334,16 +344,16 @@ export function LoginPage() {
 
                     <div className="relative">
                       <div className="absolute inset-0 flex items-center">
-                        <div className="w-full border-t border-white/10" />
+                        <div className="w-full border-t border-border/10 dark:border-white/10" />
                       </div>
                       <div className="relative flex justify-center text-xs uppercase">
-                        <span className="bg-[#0B0F17] px-2 text-muted-foreground">Or continue with</span>
+                        <span className="bg-background px-2 text-muted-foreground dark:bg-[#0B0F17]">Or continue with</span>
                       </div>
                     </div>
 
                     <Button
                       variant="outline"
-                      className="w-full h-10 border-white/10 bg-white/5 hover:bg-white/10 text-white hover:text-white transition-colors"
+                      className="w-full h-10 border-border bg-muted/50 hover:bg-muted text-foreground hover:text-foreground transition-colors dark:border-white/10 dark:bg-white/5 dark:hover:bg-white/10 dark:text-white dark:hover:text-white"
                       onClick={handleGoogleLogin}
                       disabled={isSubmitting}
                     >
@@ -356,7 +366,7 @@ export function LoginPage() {
                       {isSubmitting ? "Signing in..." : "Sign in with Google"}
                     </Button>
 
-                    <div className="text-center text-sm text-muted-foreground pt-4 border-t border-white/10">
+                    <div className="text-center text-sm text-muted-foreground pt-4 border-t border-border/10 dark:border-white/10">
                       <span className="flex items-center justify-center gap-2">
                         <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
                         Google OAuth Authentication
