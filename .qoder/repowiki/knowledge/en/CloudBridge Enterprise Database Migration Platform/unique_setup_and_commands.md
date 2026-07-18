@@ -1,1 +1,0 @@
-`docker compose up --build` boots db → backend → frontend in one shot; locally each child runs independently (`python run.py` in `backend/`, `npm run dev` in `frontend/`) after copying their respective `.env.example` files.

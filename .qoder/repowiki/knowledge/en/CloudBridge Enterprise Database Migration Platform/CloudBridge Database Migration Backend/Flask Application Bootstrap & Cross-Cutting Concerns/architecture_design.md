@@ -1,7 +1,0 @@
-The module is organized as a thin bootstrap layer consumed by `app/__init__.py` (not in scope) which calls `create_app()` to assemble the app. Internal boundaries:
-- `config.py`: immutable `BaseConfig` dataclass plus `DevelopmentConfig`/`TestingConfig`/`ProductionConfig` subclasses selected via `get_config()`, all values sourced from `os.getenv` with `dotenv.load_dotenv()` at import time.
-- `extensions.py`: zero-config singleton instances of `SQLAlchemy`, `CORS`, and `SocketIO` created without an app context so they can be imported anywhere and later bound via `init_app`.
-- `logging.py`: `configure_logging(app)` uses `logging.config.dictConfig` to wire console (always) and optional file handler (`LOG_FILE`), then attaches `before_request`/`after_request` hooks that log method, path, status and duration.
-- `errors.py`: `register_error_handlers(app)` installs `HTTPException` and bare `Exception` handlers returning a uniform `{error: {code, message, status}}` JSON envelope.
-- `run.py`: process entry point that imports `create_app`, enforces `SECRET_KEY` when not in debug mode, and delegates to `app.run(host, port, debug)`.
-Dependency direction is one-way: `run.py` → `app.create_app` → config/extensions/logging/errors; no cross-imports between these files except `run.py` importing the factory.

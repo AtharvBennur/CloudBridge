@@ -1,1 +1,0 @@
-Docker + Docker Compose is the single deployment surface for both children; PostgreSQL 16 is the shared data store; the frontend is baked against `VITE_API_BASE_URL` / `VITE_WS_BASE_URL` at image-build time rather than runtime.

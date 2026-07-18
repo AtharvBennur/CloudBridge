@@ -1,5 +1,0 @@
-- String enums are implemented as plain classes exposing constant attributes plus a `VALUES` set used by both model defaults and schema validators.
-- DTOs are frozen `dataclass`es with paired `from_model`/`to_dict` (and `from_payload` for requests) converting between ORM instances and JSON-safe dicts.
-- Service-layer errors form a small hierarchy (`CDCServiceError` base, `CDCConfigNotFoundError`, `CDCValidationError`) raised from the service and mapped to HTTP 400/404 by dedicated `@bp.errorhandler` functions.
-- Timestamp columns use `server_default=text("CURRENT_TIMESTAMP")` with `onupdate=datetime.utcnow` to keep created/updated times consistent across models.
-- Route handlers follow a uniform pattern: parse JSON with `request.get_json(silent=True)`, call a single service method, wrap the result via a response DTO's `from_model().to_dict()`, and catch service exceptions to return `{"error": {"message": ...}}`.

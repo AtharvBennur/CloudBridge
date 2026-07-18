@@ -1,1 +1,0 @@
-`python run.py` starts the dev server (requires `SECRET_KEY` when not DEBUG); `pytest -c pytest.ini` runs tests against the SQLite instance at `instance/cloudbridge.db`; `alembic -c alembic.ini` manages migrations under `migrations/`.

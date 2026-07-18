@@ -1,5 +1,0 @@
-- Each domain feature has its own service file under `src/services/` (e.g. `migrationService.ts`) that exports typed functions calling the shared `apiClient` — pages never call axios directly.
-- Every protected page route is composed as `<ProtectedRoute><AppShell><XxxPage /></AppShell></ProtectedRoute>` in `src/App.tsx`, centralizing auth checks and layout wrapping.
-- Global cross-cutting state (auth, theme) is exposed via React Context with a custom `useXxx()` hook that throws when used outside its provider.
-- UI primitives in `components/ui/` are small, unstyled-by-default Radix wrappers styled only with Tailwind utility classes and class-variance-authority variants.
-- Environment values are accessed through the centralized `@/lib/env` module rather than direct `import.meta.env` calls.

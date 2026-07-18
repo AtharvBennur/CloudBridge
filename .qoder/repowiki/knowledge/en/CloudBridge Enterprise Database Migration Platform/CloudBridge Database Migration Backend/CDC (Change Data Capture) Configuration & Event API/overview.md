@@ -1,1 +1,0 @@
-Flask blueprint, service layer, SQLAlchemy models, and Pydantic-style dataclasses that expose CDC configuration CRUD and change-event tracking for migration jobs.

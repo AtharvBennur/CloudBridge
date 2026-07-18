@@ -1,1 +1,0 @@
-Top-level monorepo that composes a Flask backend and React dashboard into a single Docker Compose stack sharing one PostgreSQL instance, with the frontend proxying API/WS calls to the backend.

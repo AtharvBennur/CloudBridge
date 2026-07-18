@@ -1,2 +1,0 @@
-- Each child owns its own `.env.example` plus a multi-stage `Dockerfile`; the root `.env.example` only documents compose-level variables like `DB_PORT`, `BACKEND_PORT`, `FRONTEND_PORT`, and `VITE_*`.
-- New features are added symmetrically: a new Flask blueprint under `backend/app/routes/` paired with a matching page component under `frontend/src/pages/` and an API client under `frontend/src/services/`.

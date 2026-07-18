@@ -1,6 +1,0 @@
-Three-layer layout inside the module:
-- `routes/auth.py` defines the `auth` Blueprint under `/auth`, registers error handlers for `AuthValidationError`/`AuthError`, and delegates every endpoint to an `AuthService` instance.
-- `services/auth_service.py` is a stateless `AuthService` class that validates payloads via `LoginRequest.from_payload`, calls `encode_token` from `app.middleware.auth` (outside this scope) to sign JWTs, and returns `AuthResponse` dataclasses; it uses Flask's `current_app.logger` for structured logging.
-- `schemas/auth.py` holds frozen Pydantic-style dataclasses (`LoginRequest`, `AuthResponse`) with manual validation in `from_payload` and a `to_dict()` serializer used by the route layer.
-- `models/audit_log.py` is a separate SQLAlchemy model (`AuditLog` on table `audit_logs`) plus an `AuditEventType` constant registry covering MIGRATION/CDC/SCHEMA/ECS/AWS/DATABASE/USER categories; it depends on `app.extensions.db` but is not imported by the auth service itself — it exists as a shared persistence primitive for other subsystems.
-Dependency direction: routes → services → schemas + middleware; models are independent of the auth flow.

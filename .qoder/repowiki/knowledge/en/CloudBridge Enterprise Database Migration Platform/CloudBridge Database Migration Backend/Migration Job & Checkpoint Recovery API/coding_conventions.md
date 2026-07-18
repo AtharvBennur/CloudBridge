@@ -1,6 +1,0 @@
-- Each blueprint defines a module-level Blueprint instance and a singleton service object at import time, then decorates route handlers with `@login_required` before calling the service.
-- Domain errors raised by services are caught by per-blueprint `@errorhandler` functions that return a uniform `{"error":{"message": ...}}` JSON body with an appropriate HTTP status code.
-- Request payloads are validated by frozen `dataclass` schemas exposing a `from_payload` classmethod that raises `ValueError` on invalid input, which services translate into domain-specific validation exceptions.
-- Response objects are frozen dataclasses with explicit `to_dict()` / `from_model()` converters so routes always serialize via `.to_dict()` rather than dumping raw ORM instances.
-- Services log through a `_log_info` helper that falls back to `current_app.logger` when no injected logger is provided, keeping unit-testability via constructor injection.
-- Database mutations wrap writes in try/except blocks that call `db.session.rollback()` on validation errors before re-raising as typed domain exceptions.

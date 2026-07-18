@@ -1,1 +1,0 @@
-Initializes the Flask application instance, loads environment-driven configuration, registers shared extensions, logging, and error handlers.

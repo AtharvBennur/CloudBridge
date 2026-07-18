@@ -1,9 +1,0 @@
-Layered Flask app module with a clear dependency direction: routes → services → model/AWS client.
-
-- `routes/aws_connection.py` defines the `aws_connection` Blueprint under `/aws-connections`, exposing thin HTTP handlers that delegate to `AWSConnectionService`; it registers custom error handlers for `AWSConnectionValidationError`, `AWSConnectionNotFoundError`, and `AWSConnectionIntegrationError` (mapping integration errors to 502).
-- `services/aws_connection_service.py` owns all business logic: request parsing via schema DTOs, SQLAlchemy persistence through `app.extensions.db`, cross-account STS calls via `app.utils.aws_client.AWSClient` (`test_connection`, `assume_role`, `verify_account_id`, `validate_region_access`, `validate_iam_permissions`), and status transitions between PENDING/CONNECTED/DISCONNECTED. It also depends on `CloudFormationService` for template generation.
-- `services/secrets_manager_service.py` is a sibling service that performs create/update/retrieve/validate/delete against the *customer's* Secrets Manager using an assumed-role session obtained from `AWSConnection.role_arn` + `external_id`.
-- `schemas/aws_connection.py` holds frozen dataclass DTOs (`CreateAWSConnectionRequest`, `UpdateAWSConnectionRequest`, `ConnectAWSConnectionRequest`, `AWSConnectionResponse`, `DeleteAWSConnectionResponse`) plus the shared `AWSConnectionValidation` helper class with regex validators for account ID, region, role ARN, and UUID external ID; DTOs expose `from_payload` / `to_dict` / `from_model` converters.
-- `models/aws_connection.py` defines the SQLAlchemy `AWSConnection` table (`aws_connections`) with an `AWSConnectionStatus` enum-like class providing the allowed values used by both schemas and service.
-
-Dependency direction is strictly one-way: routes depend on services and exceptions; services depend on models, schemas, and `AWSClient`; models have no intra-module dependencies.

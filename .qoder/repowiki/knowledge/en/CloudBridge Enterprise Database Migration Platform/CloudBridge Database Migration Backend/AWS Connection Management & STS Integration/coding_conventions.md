@@ -1,6 +1,0 @@
-- Each endpoint handler is a thin function that reads JSON via `request.get_json(silent=True)`, delegates to a single service method, and returns `jsonify(...)` with an explicit HTTP status code.
-- All request payloads are parsed and validated through frozen dataclass DTOs with a `from_payload` classmethod that raises `ValueError`, which the service catches and re-raises as `AWSConnectionValidationError`.
-- Cross-cutting AWS operations go through `app.utils.aws_client.AWSClient` rather than direct boto3 calls, enabling a simulated mode where `_is_simulated` short-circuits real API calls.
-- Per-operation logging uses a private `_log_info` helper that formats messages with optional `aws_connection_id` and `aws_account_id` context via Flask's configured logger.
-- State mutations wrap DB writes in try/except blocks that rollback on validation errors before raising domain-specific exceptions, keeping transaction boundaries inside the service.
-- Optional-update endpoints accept `None` fields and only overwrite non-None attributes, letting callers perform partial updates without supplying the full object.

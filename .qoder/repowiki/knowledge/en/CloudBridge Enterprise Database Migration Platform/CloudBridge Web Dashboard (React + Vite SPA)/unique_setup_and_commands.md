@@ -1,1 +1,0 @@
-`npm run dev` starts Vite on port 5173 with proxy rules forwarding `/api` → `http://localhost:5000` (stripping the `/api` prefix) and `/socket.io` as WebSocket to the same backend; `npm run build` runs `tsc -b` then `vite build`. A Dockerfile + `nginx.conf` are provided for containerized production deployment.

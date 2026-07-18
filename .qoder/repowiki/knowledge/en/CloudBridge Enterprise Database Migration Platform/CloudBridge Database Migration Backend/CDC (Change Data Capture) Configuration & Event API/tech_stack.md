@@ -1,1 +1,0 @@
-Flask Blueprint + Flask-SQLAlchemy models; request/response contracts are plain frozen `dataclasses` (no marshmallow/pydantic); PostgreSQL logical replication concepts surfaced as strings (`replication_slot_name`, `publication_name`, `lsn`).

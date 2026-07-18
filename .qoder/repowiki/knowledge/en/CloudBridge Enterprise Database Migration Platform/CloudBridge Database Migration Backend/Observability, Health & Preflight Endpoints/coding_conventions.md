@@ -1,6 +1,0 @@
-- Each feature owns a module-level singleton instance of its service class (e.g. `observability_service = ObservabilityService()`, `preflight_service = PreflightService()`, `websocket_service = WebSocketService()`) imported by the route file rather than instantiating inside handlers.
-- Route handlers accept JSON via `request.get_json(silent=True) or {}` and forward keyword arguments to the service method, keeping payload parsing out of the service layer.
-- Service methods raise domain exceptions (`ObservabilityServiceError`, `ValueError`) instead of returning error codes; routes catch them and return `{"error":{"message":...}}` with an appropriate HTTP status.
-- Cloud-facing operations go through `AWSClient` (assume role once, then reuse credentials) and wrap boto3 calls in try/except `ClientError` blocks that log via `_log_info`/`_log_error` before re-raising as `ObservabilityServiceError`.
-- WebSocket event payloads follow a uniform shape `{event_type, migration_id/task_id, timestamp, data}` emitted through `WebSocketService.broadcast_*` static methods keyed on `migration_<id>` / `ecs_task_<id>` room names.
-- Optional dependencies (logger, AWS client) are injected via constructor defaults so services can be unit-tested without a live app context.

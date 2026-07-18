@@ -1,1 +1,0 @@
-React 19 + TypeScript 5.7, Vite 6 build, Tailwind CSS 3 + Radix UI primitives, @tanstack/react-query for server-state caching, react-hook-form + zod for form validation, axios + socket.io-client for HTTP/WebSocket, recharts for charts, framer-motion for animations, lucide-react icons.

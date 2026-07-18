@@ -1,1 +1,0 @@
-Flask Blueprint + SQLAlchemy (via `app.extensions.db`) for persistence; AWS SDK via `botocore.exceptions.ClientError` through a shared `app.utils.aws_client.AWSClient` that handles STS AssumeRole per connection; CloudFormation templates built as plain Python dicts rather than using a CFN library.

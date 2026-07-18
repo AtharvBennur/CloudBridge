@@ -1,1 +1,0 @@
-Flask blueprint and service layer for CRUD of customer AWS account connections, including STS AssumeRole-based connect/validate/disconnect flows and per-account Secrets Manager operations.
