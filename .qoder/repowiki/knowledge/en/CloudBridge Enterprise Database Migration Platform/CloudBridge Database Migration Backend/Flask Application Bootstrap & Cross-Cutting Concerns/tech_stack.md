@@ -1,0 +1,1 @@
+Flask + Flask-SQLAlchemy + Flask-CORS + Flask-SocketIO, configuration via python-dotenv, structured logging through Python stdlib `logging.config.dictConfig`.

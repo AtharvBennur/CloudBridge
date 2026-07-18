@@ -1,0 +1,1 @@
+Flask auth blueprint providing login, Google OAuth, logout and current-user endpoints backed by JWT token issuance, with a shared SQLAlchemy audit-log model for system events.

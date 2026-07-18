@@ -1,8 +1,9 @@
-import { Bell, LogOut, Menu, Search, ChevronDown, User, Settings, AlertCircle, Info, CheckCircle } from "lucide-react";
-import { useState, useEffect, useRef, useCallback } from "react";
+import { Bell, LogOut, Menu, ChevronDown, User, Settings, AlertCircle, Info, CheckCircle } from "lucide-react";
+import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 
 import { ThemeToggle } from "@/components/theme/ThemeToggle";
+import { CommandPalette } from "@/components/ui/command-palette";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/context/AuthContext";
 import { cn } from "@/lib/utils";
@@ -62,7 +63,6 @@ export function TopNavbar({
   const [showProfileMenu, setShowProfileMenu] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
   const [notifications, setNotifications] = useState<Notification[]>([]);
-  const [searchQuery, setSearchQuery] = useState("");
 
   const profileRef = useRef<HTMLDivElement>(null);
   const notifRef = useRef<HTMLDivElement>(null);
@@ -92,17 +92,10 @@ export function TopNavbar({
       .catch(() => {});
   }, []);
 
-  const handleSearchKeyDown = useCallback(
-    (e: React.KeyboardEvent<HTMLInputElement>) => {
-      if (e.key === "Enter" && searchQuery.trim()) {
-        navigate(`/migrations?q=${encodeURIComponent(searchQuery.trim())}`);
-      }
-    },
-    [searchQuery, navigate],
-  );
-
   return (
     <header className="sticky top-0 z-20 border-b border-border/70 bg-gradient-to-b from-background/95 to-background/80 px-4 py-3 backdrop-blur-xl md:px-6">
+      {/* Subtle top accent line */}
+      <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-primary/40 to-transparent" />
       <div className="flex items-center justify-between gap-4">
         <div className="flex min-w-0 items-center gap-3">
           <Button
@@ -123,21 +116,7 @@ export function TopNavbar({
           >
             <Menu className="h-5 w-5" />
           </Button>
-          <div className="hidden h-11 w-[min(36vw,420px)] items-center gap-3 rounded-2xl border border-border/70 bg-card/80 px-4 text-sm text-muted-foreground shadow-sm transition-all focus-within:border-primary/50 focus-within:ring-2 focus-within:ring-primary/20 md:flex">
-            <Search className="h-4 w-4 text-muted-foreground" />
-            <input
-              type="text"
-              placeholder="Search migrations, accounts, and health..."
-              className="flex-1 bg-transparent outline-none placeholder:text-muted-foreground/60"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              onKeyDown={handleSearchKeyDown}
-            />
-            <kbd className="hidden h-6 items-center gap-1 rounded border border-border/50 bg-muted/50 px-2 text-xs font-medium text-muted-foreground sm:flex">
-              <span>⌘</span>
-              <span>K</span>
-            </kbd>
-          </div>
+          <CommandPalette />
         </div>
 
         <div className="flex items-center gap-2">
@@ -145,22 +124,22 @@ export function TopNavbar({
             <Button
               variant="ghost"
               size="icon"
-              className="relative hover:bg-muted/50"
+              className="relative hover:bg-muted/50 transition-transform hover:scale-105"
               aria-label="Notifications"
               onClick={() => setShowNotifications(!showNotifications)}
             >
               <Bell className="h-4 w-4" />
               {unreadCount > 0 && (
-                <span className="absolute top-1.5 right-1.5 h-2 w-2 rounded-full bg-red-500" />
+                <span className="absolute top-1.5 right-1.5 h-2 w-2 rounded-full bg-gradient-to-r from-rose-500 to-red-500 animate-pulse-soft" />
               )}
             </Button>
 
             {showNotifications && (
-              <div className="absolute right-0 top-12 w-96 rounded-xl border border-border/70 bg-background/95 backdrop-blur-xl shadow-soft p-2">
+              <div className="absolute right-0 top-12 w-96 rounded-xl border border-border/70 bg-background/95 backdrop-blur-xl shadow-soft p-2 animate-scale-in">
                 <div className="flex items-center justify-between px-3 py-2 border-b border-border/50 mb-2">
                   <h3 className="font-semibold text-sm">Notifications</h3>
                   {unreadCount > 0 && (
-                    <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={markAllAsRead}>
+                    <Button variant="ghost" size="sm" className="h-7 text-xs text-primary hover:text-primary/80" onClick={markAllAsRead}>
                       Mark all read
                     </Button>
                   )}
@@ -222,14 +201,14 @@ export function TopNavbar({
               className="flex items-center gap-2 h-10 px-2 hover:bg-muted/50"
               onClick={() => setShowProfileMenu(!showProfileMenu)}
             >
-              <div className="h-8 w-8 rounded-full bg-gradient-to-br from-primary to-blue-500 flex items-center justify-center text-sm font-semibold text-primary-foreground shadow-md">
+              <div className="h-8 w-8 rounded-full bg-gradient-to-br from-violet-500 via-indigo-500 to-blue-500 flex items-center justify-center text-sm font-semibold text-white shadow-md ring-2 ring-white/20 dark:ring-white/10 transition-transform hover:scale-105">
                 {user?.displayName?.charAt(0) || "?"}
               </div>
               <ChevronDown className="h-4 w-4" />
             </Button>
 
             {showProfileMenu && (
-              <div className="absolute right-0 top-12 w-56 rounded-xl border border-border/70 bg-background/95 backdrop-blur-xl shadow-soft p-2">
+              <div className="absolute right-0 top-12 w-56 rounded-xl border border-border/70 bg-background/95 backdrop-blur-xl shadow-soft p-2 animate-scale-in">
                 <div className="px-3 py-2 border-b border-border/50 mb-2">
                   <p className="text-sm font-medium text-foreground">{user?.displayName || "User"}</p>
                   <p className="text-xs text-muted-foreground">{user?.email || ""}</p>

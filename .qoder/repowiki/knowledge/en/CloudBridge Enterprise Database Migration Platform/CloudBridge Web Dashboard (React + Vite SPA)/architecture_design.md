@@ -1,0 +1,7 @@
+Entry point `src/main.tsx` bootstraps a React 19 app with three stacked providers — `QueryClientProvider` (@tanstack/react-query), `ThemeProvider`, and `AuthProvider` — before mounting `<App>`.
+
+- Routing: `src/App.tsx` declares all routes via react-router-dom; every protected route is wrapped in `<ProtectedRoute>` and `<AppShell>`, which composes `Sidebar` + `TopNavbar` (`components/layout`).
+- State layering: global UI state lives in `src/context/` (`AuthContext`, `ThemeContext`); domain data is fetched exclusively through thin service modules under `src/services/*` (one file per feature: `authService`, `migrationService`, `cdcService`, `ecsService`, …). Each service imports a shared `apiClient` (axios instance) that injects a Bearer token from `sessionStorage.cloudbridge_auth` via an interceptor and normalizes server errors into thrown `Error`s.
+- Real-time updates: `websocketService` uses socket.io-client to subscribe to backend events consumed by pages.
+- UI composition: `components/ui/` holds Radix-based primitives (button, dialog, select, tabs, tooltip, …) built with class-variance-authority + tailwind-merge; feature-specific presentational components live under `components/migrations/` and `components/theme/`; pages are one-file React components under `src/pages/`.
+- Build & dev: Vite config sets up `@` path alias, proxies `/api` and `/socket.io` to `http://localhost:5000`, and ships a Dockerfile + nginx.conf for production serving. Environment variables are read through `src/lib/env.ts`.

@@ -1,0 +1,1 @@
+Flask REST API for managing database onboarding configurations (source/destination) with optional AWS Secrets Manager credential storage and TCP reachability checks.

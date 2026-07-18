@@ -1,33 +1,21 @@
-/*
-Purpose:
-This file provides the create-migration experience.
-
-Why:
-Users need a guided form to register new migration jobs with the backend.
-
-Architecture:
-Protected App Shell
-↓
-Create Migration Page
-↓
-Migration Service
-*/
-
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { motion } from "framer-motion";
+import { DatabaseZap, ArrowLeft } from "lucide-react";
 
-import { MigrationForm, type MigrationFormValues } from "@/components/migrations/MigrationForm";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { MigrationWizard, type WizardValues } from "@/components/migrations/MigrationWizard";
+import { useToast } from "@/components/ui/toast";
 import { migrationService } from "@/services/migrationService";
 
 export function MigrationCreatePage() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const { toast } = useToast();
 
   const createMutation = useMutation({
-    mutationFn: (values: MigrationFormValues) =>
+    mutationFn: (values: WizardValues) =>
       migrationService.create({
         job_name: values.job_name,
         source_database: values.source_database,
@@ -36,45 +24,50 @@ export function MigrationCreatePage() {
       }),
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ["migrations"] });
+      toast({ title: "Migration created", description: "Your migration job has been registered successfully.", variant: "success" });
       navigate("/migrations");
     },
     onError: (error: unknown) => {
-      setErrorMessage(error instanceof Error ? error.message : "Unable to create migration job.");
+      toast({
+        title: "Failed to create migration",
+        description: error instanceof Error ? error.message : "Unable to create migration job.",
+        variant: "destructive",
+      });
     },
   });
 
   return (
     <div className="mx-auto max-w-5xl space-y-6">
-      <div>
-        <h1 className="text-3xl font-semibold">Create migration job</h1>
-        <p className="mt-2 text-sm text-muted-foreground">
-          Register migration metadata so the platform can track each transformation workstream.
-        </p>
-      </div>
+      <motion.div
+        initial={{ opacity: 0, y: 16 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.35 }}
+        className="flex flex-col gap-4 rounded-3xl border border-border/70 bg-gradient-to-br from-primary/10 via-card to-card p-6 shadow-soft"
+      >
+        <div className="flex items-start gap-3">
+          <div className="rounded-2xl bg-primary/10 p-3 text-primary">
+            <DatabaseZap className="h-6 w-6" />
+          </div>
+          <div>
+            <div className="mb-2 flex items-center gap-2">
+              <Badge variant="info">Multi-Step Wizard</Badge>
+            </div>
+            <h1 className="text-3xl font-semibold tracking-tight">Create Migration Job</h1>
+            <p className="mt-2 text-sm text-muted-foreground">
+              Configure a new database migration with our guided setup wizard.
+            </p>
+          </div>
+        </div>
+        <Button variant="ghost" size="sm" onClick={() => navigate("/migrations")} className="w-fit -ml-1">
+          <ArrowLeft className="mr-1 h-4 w-4" />
+          Back to migrations
+        </Button>
+      </motion.div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Migration details</CardTitle>
-          <CardDescription>Fields mirror the backend schema and validation rules.</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <MigrationForm
-            initialValues={{
-              job_name: "",
-              source_database: "",
-              destination_database: "",
-              description: "",
-            }}
-            submitLabel="Create migration"
-            isSubmitting={createMutation.isPending}
-            errorMessage={errorMessage}
-            onSubmit={(values) => {
-              setErrorMessage(null);
-              createMutation.mutate(values);
-            }}
-          />
-        </CardContent>
-      </Card>
+      <MigrationWizard
+        onSubmit={(values) => createMutation.mutate(values)}
+        isSubmitting={createMutation.isPending}
+      />
     </div>
   );
 }

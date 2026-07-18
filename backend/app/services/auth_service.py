@@ -50,7 +50,7 @@ class AuthService:
             message="Authentication successful",
             user={
                 "email": user_email,
-                "display_name": display_name,
+                "displayName": display_name,
             },
             token=token,
         )
@@ -78,7 +78,7 @@ class AuthService:
             message="Google OAuth authentication successful",
             user={
                 "email": email,
-                "display_name": name or email.split("@")[0],
+                "displayName": name or email.split("@")[0],
             },
             token=token,
         )
@@ -96,7 +96,7 @@ class AuthService:
                 message="User session valid",
                 user={
                     "email": user_email,
-                    "display_name": user_email.split("@")[0],
+                    "displayName": user_email.split("@")[0],
                 },
             )
         return AuthResponse(message="User session valid")

@@ -3,6 +3,7 @@ import { useLocation } from "react-router-dom";
 
 import { Sidebar } from "@/components/layout/Sidebar";
 import { TopNavbar } from "@/components/layout/TopNavbar";
+import { ToastProvider } from "@/components/ui/toast";
 import { websocketService } from "@/services/websocketService";
 import { env } from "@/lib/env";
 
@@ -75,6 +76,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   }, []);
 
   return (
+    <ToastProvider>
     <div className="min-h-screen bg-[radial-gradient(circle_at_top_left,_rgba(59,130,246,0.14),_transparent_28%),linear-gradient(135deg,_rgba(255,255,255,0.98),_rgba(248,250,252,1))] dark:bg-[radial-gradient(circle_at_top_left,_rgba(14,165,233,0.2),_transparent_30%),linear-gradient(135deg,_rgba(2,6,23,0.96),_rgba(15,23,42,1))]">
       <div className="flex min-h-screen">
         <Sidebar
@@ -93,5 +95,6 @@ export function AppShell({ children }: { children: ReactNode }) {
         </div>
       </div>
     </div>
+    </ToastProvider>
   );
 }

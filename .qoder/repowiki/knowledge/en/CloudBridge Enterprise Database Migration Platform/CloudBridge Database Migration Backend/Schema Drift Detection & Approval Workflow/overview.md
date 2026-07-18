@@ -1,0 +1,1 @@
+Flask API and service layer that captures database schema snapshots, compares them to detect drift, and gates high-risk changes behind a manual or bulk approval workflow before resuming migrations.

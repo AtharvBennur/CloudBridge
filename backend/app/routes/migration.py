@@ -16,6 +16,7 @@ Migration Model
 from flask import Blueprint, jsonify, request
 
 from app.exceptions.migration import MigrationError, MigrationNotFoundError, MigrationValidationError
+from app.middleware.auth import login_required
 from app.services.migration_service import MigrationService
 
 
@@ -41,7 +42,8 @@ def handle_migration_error(error: MigrationError):
     return jsonify({"error": {"message": error.message}}), 400
 
 
-@migration_bp.post("")
+@migration_bp.post('')
+@login_required
 def create_migration():
     """Create a new migration job and return the stored representation."""
     payload = request.get_json(silent=True)
@@ -49,21 +51,24 @@ def create_migration():
     return jsonify(response.to_dict()), 201
 
 
-@migration_bp.get("")
+@migration_bp.get('')
+@login_required
 def list_migrations():
     """Return all migration jobs known to the system."""
     response = migration_service.list()
     return jsonify([item.to_dict() for item in response]), 200
 
 
-@migration_bp.get("/<int:migration_id>")
+@migration_bp.get('/<int:migration_id>')
+@login_required
 def get_migration(migration_id: int):
     """Return a single migration job by its identifier."""
     response = migration_service.get(migration_id)
     return jsonify(response.to_dict()), 200
 
 
-@migration_bp.put("/<int:migration_id>")
+@migration_bp.put('/<int:migration_id>')
+@login_required
 def update_migration(migration_id: int):
     """Update an existing migration job and return the persisted record."""
     payload = request.get_json(silent=True)
@@ -71,7 +76,8 @@ def update_migration(migration_id: int):
     return jsonify(response.to_dict()), 200
 
 
-@migration_bp.delete("/<int:migration_id>")
+@migration_bp.delete('/<int:migration_id>')
+@login_required
 def delete_migration(migration_id: int):
     """Delete a migration job and return a confirmation response."""
     response = migration_service.delete(migration_id)

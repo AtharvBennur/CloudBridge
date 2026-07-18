@@ -1,0 +1,14 @@
+schema_version: 1
+module_path: backend/cdc_domain
+title: CDC (Change Data Capture) Configuration & Event API
+scope:
+    - backend/app/routes/cdc.py
+    - backend/app/services/cdc_service.py
+    - backend/app/schemas/cdc.py
+    - backend/app/models/cdc_config.py
+    - backend/app/models/cdc_event.py
+source_files: []
+depends_on: []
+related_to:
+    - path: backend/migration_domain
+    - path: frontend

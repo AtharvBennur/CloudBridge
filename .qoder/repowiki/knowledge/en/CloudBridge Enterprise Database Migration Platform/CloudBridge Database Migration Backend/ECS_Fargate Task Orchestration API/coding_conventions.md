@@ -1,0 +1,5 @@
+- HTTP error handlers are registered on the Blueprint itself (`@ecs_bp.errorhandler(...)`) so each sub-domain returns a uniform `{"error":{"message":...}}` envelope instead of Flask's default traceback.
+- Input payloads are validated by a frozen dataclass `from_payload` classmethod that raises `ValueError` with human-readable messages, keeping route bodies free of parsing logic.
+- Every service method follows the same pattern: lookup entity by id → raise `ECSTaskNotFoundError` if missing → call `self._aws_client.assume_role(aws_connection.role_arn, aws_connection.external_id, aws_connection.aws_region)` → build a boto3 client scoped to that region → catch `ClientError` and re-raise as `ECSServiceError`.
+- List/read-only endpoints import `ECSTask` lazily at function scope to avoid circular imports between routes and models, while write paths go through `ECSService`.
+- JSON arrays stored in the DB (`subnet_ids`, `security_group_ids`) are serialized with `json.dumps` on write and deserialized with `json.loads` on read, both in the service and in `ECSTaskResponse.from_model`.

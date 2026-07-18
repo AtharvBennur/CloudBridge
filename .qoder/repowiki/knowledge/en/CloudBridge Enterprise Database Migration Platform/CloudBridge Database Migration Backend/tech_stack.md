@@ -1,0 +1,1 @@
+Flask + Flask-SocketIO (threading async mode) + SQLAlchemy + Alembic + Pydantic-style dataclasses + AWS SDK (boto3) for STS/Secrets Manager/ECS/CloudFormation, all configured through a `.env`-driven config loader.

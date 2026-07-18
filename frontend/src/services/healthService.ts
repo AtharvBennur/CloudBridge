@@ -1,7 +1,9 @@
 import { apiClient } from "@/services/apiClient";
 
 export interface HealthResponse {
-  status: "healthy";
+  status: "healthy" | "degraded";
+  database: "connected" | "disconnected";
+  timestamp: number;
 }
 
 export async function getHealth(): Promise<HealthResponse> {

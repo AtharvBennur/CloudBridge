@@ -1,0 +1,13 @@
+schema_version: 1
+module_path: backend/database_config
+title: Database Onboarding Configuration API
+scope:
+    - backend/app/routes/database_config.py
+    - backend/app/services/database_config_service.py
+    - backend/app/schemas/database_config.py
+    - backend/app/models/database_config.py
+source_files: []
+depends_on: []
+related_to:
+    - path: backend/migration_domain
+    - path: frontend

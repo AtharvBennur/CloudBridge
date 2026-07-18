@@ -1,0 +1,4 @@
+- Request/response contracts are expressed as frozen `@dataclass` objects with a `from_payload` / `to_dict` pair rather than Pydantic or marshmallow validators.
+- Service methods raise domain-specific exceptions (`AuthValidationError`) instead of returning error codes, letting the Blueprint-level `@errorhandler` decorators translate them into uniform JSON responses.
+- Structured logging goes through `_log_info` which resolves `current_app.logger` at call time so the service remains instantiable outside a Flask context.
+- Event-type constants are grouped in a single class (`AuditEventType`) exposing both named attributes and a `VALUES` set for DB constraint enforcement.

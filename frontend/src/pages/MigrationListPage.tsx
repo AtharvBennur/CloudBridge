@@ -1,28 +1,15 @@
-/*
-Purpose:
-This file displays the migration-job list view.
-
-Why:
-Users need a reliable list page to review and manage their migration work.
-
-Architecture:
-Protected App Shell
-↓
-Migration List Page
-↓
-Migration Service
-*/
-
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ArrowRight, Plus, Trash2, PencilLine, Eye, DatabaseZap } from "lucide-react";
 import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { motion } from "framer-motion";
 
 import { ConfirmDeleteDialog } from "@/components/migrations/ConfirmDeleteDialog";
 import { StatusBadge } from "@/components/migrations/StatusBadge";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { migrationService } from "@/services/migrationService";
+import { DataTable, type Column } from "@/components/ui/data-table";
+import { migrationService, type MigrationJob } from "@/services/migrationService";
 
 function formatDate(value: string) {
   return new Date(value).toLocaleString();
@@ -48,30 +35,62 @@ export function MigrationListPage() {
   });
 
   const sortedMigrations = useMemo(() => {
-    if (!migrationsQuery.data) {
-      return [];
-    }
-
-    return [...migrationsQuery.data].sort((left, right) => right.id - left.id);
+    if (!migrationsQuery.data) return [];
+    return [...migrationsQuery.data].sort((a, b) => b.id - a.id);
   }, [migrationsQuery.data]);
 
-  const handleDelete = () => {
-    if (selectedMigrationId === null) {
-      return;
-    }
+  const columns: Column<MigrationJob>[] = [
+    {
+      key: "job_name",
+      header: "Job Name",
+      accessor: (row) => <span className="font-semibold text-foreground">{row.job_name}</span>,
+    },
+    {
+      key: "source_database",
+      header: "Source",
+      accessor: (row) => <span className="text-muted-foreground">{row.source_database}</span>,
+    },
+    {
+      key: "destination_database",
+      header: "Destination",
+      accessor: (row) => (
+        <span className="text-muted-foreground flex items-center gap-1">
+          {row.destination_database}
+          <ArrowRight className="h-3 w-3" />
+        </span>
+      ),
+    },
+    {
+      key: "status",
+      header: "Status",
+      accessor: (row) => <StatusBadge status={row.status} />,
+    },
+    {
+      key: "created_at",
+      header: "Created",
+      accessor: (row) => <span className="text-muted-foreground text-xs">{formatDate(row.created_at)}</span>,
+    },
+  ];
 
+  const handleDelete = () => {
+    if (selectedMigrationId === null) return;
     deleteMutation.mutate(selectedMigrationId);
   };
 
   return (
     <div className="mx-auto max-w-7xl space-y-6">
-      <div className="flex flex-col gap-4 rounded-3xl border border-border/70 bg-card/80 p-6 shadow-sm md:flex-row md:items-center md:justify-between">
+      <motion.div
+        initial={{ opacity: 0, y: 16 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.35 }}
+        className="flex flex-col gap-4 rounded-3xl border border-border/70 bg-card/80 p-6 shadow-sm md:flex-row md:items-center md:justify-between"
+      >
         <div className="flex items-start gap-3">
           <div className="rounded-2xl bg-primary/10 p-3 text-primary">
             <DatabaseZap className="h-5 w-5" />
           </div>
           <div>
-            <h1 className="text-3xl font-semibold">Migration jobs</h1>
+            <h1 className="text-3xl font-semibold">Migration Jobs</h1>
             <p className="mt-2 text-sm text-muted-foreground">
               Review and manage metadata for every workflow in your migration catalog.
             </p>
@@ -80,83 +99,47 @@ export function MigrationListPage() {
 
         <Button onClick={() => navigate("/migrations/new")}>
           <Plus className="h-4 w-4" />
-          New migration
+          New Migration
         </Button>
-      </div>
+      </motion.div>
 
-      <Card className="border-border/70 shadow-sm">
-        <CardHeader>
-          <CardTitle>All migrations</CardTitle>
-          <CardDescription>List of jobs created through the backend CRUD API.</CardDescription>
-        </CardHeader>
-        <CardContent>
-          {migrationsQuery.isLoading ? (
-            <div className="rounded-2xl border border-dashed p-8 text-sm text-muted-foreground">
-              Loading migration jobs…
-            </div>
-          ) : null}
-
-          {migrationsQuery.isError ? (
-            <div className="rounded-2xl border border-destructive/40 bg-destructive/10 p-4 text-sm text-destructive">
-              {migrationsQuery.error instanceof Error
-                ? migrationsQuery.error.message
-                : "Unable to load migration jobs."}
-            </div>
-          ) : null}
-
-          {!migrationsQuery.isLoading && !migrationsQuery.isError && sortedMigrations.length === 0 ? (
-            <div className="rounded-2xl border border-dashed p-8 text-center text-sm text-muted-foreground">
-              No migration jobs yet. Create the first one to get started.
-            </div>
-          ) : null}
-
-          {!migrationsQuery.isLoading && !migrationsQuery.isError && sortedMigrations.length > 0 ? (
-            <div className="overflow-hidden rounded-2xl border border-border/70">
-              <table className="min-w-full divide-y divide-border text-sm">
-                <thead className="bg-muted/70 text-left">
-                  <tr>
-                    <th className="px-4 py-3 font-medium">Job name</th>
-                    <th className="px-4 py-3 font-medium">Source</th>
-                    <th className="px-4 py-3 font-medium">Destination</th>
-                    <th className="px-4 py-3 font-medium">Status</th>
-                    <th className="px-4 py-3 font-medium">Created</th>
-                    <th className="px-4 py-3 font-medium">Actions</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-border bg-background/80">
-                  {sortedMigrations.map((migration) => (
-                    <tr key={migration.id} className="align-middle">
-                      <td className="px-4 py-3 font-medium">{migration.job_name}</td>
-                      <td className="px-4 py-3 text-muted-foreground">{migration.source_database}</td>
-                      <td className="px-4 py-3 text-muted-foreground">{migration.destination_database}</td>
-                      <td className="px-4 py-3">
-                        <StatusBadge status={migration.status} />
-                      </td>
-                      <td className="px-4 py-3 text-muted-foreground">{formatDate(migration.created_at)}</td>
-                      <td className="px-4 py-3">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <Button variant="ghost" size="sm" onClick={() => navigate(`/migrations/${migration.id}`)}>
-                            <Eye className="mr-2 h-4 w-4" />
-                            View
-                          </Button>
-                          <Button variant="ghost" size="sm" onClick={() => navigate(`/migrations/${migration.id}/edit`)}>
-                            <PencilLine className="mr-2 h-4 w-4" />
-                            Edit
-                          </Button>
-                          <Button variant="ghost" size="sm" onClick={() => setSelectedMigrationId(migration.id)}>
-                            <Trash2 className="mr-2 h-4 w-4" />
-                            Delete
-                          </Button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          ) : null}
-        </CardContent>
-      </Card>
+      <DataTable
+        data={sortedMigrations}
+        columns={columns}
+        keyField="id"
+        searchPlaceholder="Search migrations..."
+        pageSize={10}
+        isLoading={migrationsQuery.isLoading}
+        emptyMessage="No migration jobs yet. Create the first one to get started."
+        bulkActions={[
+          {
+            label: "Delete Selected",
+            icon: <Trash2 className="h-3.5 w-3.5" />,
+            variant: "destructive",
+            onClick: (selected) => {
+              if (selected.length === 1) setSelectedMigrationId(selected[0].id);
+            },
+          },
+        ]}
+        renderRowActions={(row) => (
+          <div className="flex items-center justify-end gap-1">
+            <Button variant="ghost" size="sm" onClick={() => navigate(`/migrations/${row.id}`)}>
+              <Eye className="h-3.5 w-3.5" />
+            </Button>
+            <Button variant="ghost" size="sm" onClick={() => navigate(`/migrations/${row.id}/edit`)}>
+              <PencilLine className="h-3.5 w-3.5" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setSelectedMigrationId(row.id)}
+              className="text-destructive hover:text-destructive"
+            >
+              <Trash2 className="h-3.5 w-3.5" />
+            </Button>
+          </div>
+        )}
+      />
 
       <ConfirmDeleteDialog
         open={selectedMigrationId !== null}

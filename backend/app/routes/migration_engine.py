@@ -3,6 +3,7 @@ from datetime import datetime
 from flask import Blueprint, jsonify, request, current_app
 
 from app.extensions import db
+from app.middleware.auth import login_required
 from app.models.migration import MigrationJob, MigrationStatus
 from app.models.migration_checkpoint import MigrationCheckpoint
 from app.workers.manager import worker_manager
@@ -11,6 +12,7 @@ migration_engine_bp = Blueprint("migration_engine", __name__, url_prefix="/migra
 
 
 @migration_engine_bp.post("/start")
+@login_required
 def start_migration():
     payload = request.get_json(silent=True) or {}
     migration_id = payload.get("migration_id")
@@ -42,6 +44,7 @@ def start_migration():
 
 
 @migration_engine_bp.post("/checkpoint")
+@login_required
 def save_checkpoint():
     payload = request.get_json(silent=True) or {}
     migration_id = payload.get("migration_id")
@@ -63,6 +66,7 @@ def save_checkpoint():
 
 
 @migration_engine_bp.post("/pause")
+@login_required
 def pause_migration():
     payload = request.get_json(silent=True) or {}
     migration_id = payload.get("migration_id")
@@ -80,6 +84,7 @@ def pause_migration():
 
 
 @migration_engine_bp.post("/resume")
+@login_required
 def resume_migration():
     payload = request.get_json(silent=True) or {}
     migration_id = payload.get("migration_id")
@@ -98,6 +103,7 @@ def resume_migration():
 
 
 @migration_engine_bp.post("/retry")
+@login_required
 def retry_migration():
     """Retry a failed job from its latest durable checkpoint."""
     payload = request.get_json(silent=True) or {}
@@ -118,6 +124,7 @@ def retry_migration():
 
 
 @migration_engine_bp.post("/cancel")
+@login_required
 def cancel_migration():
     payload = request.get_json(silent=True) or {}
     migration_id = payload.get("migration_id")
@@ -136,6 +143,7 @@ def cancel_migration():
 
 
 @migration_engine_bp.get("/<int:migration_id>/status")
+@login_required
 def migration_status(migration_id: int):
     migration = MigrationJob.query.get(migration_id)
     if migration is None:

@@ -1,0 +1,1 @@
+React-based single-page dashboard for managing database migrations, CDC, schema drift, ECS deployments and observability against the CloudBridge backend.

@@ -1,10 +1,34 @@
 services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: cloudbridge
+      POSTGRES_PASSWORD: cloudbridge_dev
+      POSTGRES_DB: cloudbridge
+    ports:
+      - "${DB_PORT:-5432}:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U cloudbridge"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+    networks:
+      - cloudbridge
+
   backend:
     build:
       context: ./backend
       dockerfile: Dockerfile
     env_file:
       - ./backend/.env
+    environment:
+      DATABASE_URL: postgresql://cloudbridge:cloudbridge_dev@db:5432/cloudbridge
+    depends_on:
+      db:
+        condition: service_healthy
     ports:
       - "${BACKEND_PORT:-5000}:5000"
     healthcheck:
@@ -32,6 +56,9 @@ services:
     restart: unless-stopped
     networks:
       - cloudbridge
+
+volumes:
+  pgdata:
 
 networks:
   cloudbridge:

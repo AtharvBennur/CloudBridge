@@ -16,6 +16,7 @@ Audit Log Model
 from flask import Blueprint, jsonify, request
 
 from app.exceptions.observability import ObservabilityServiceError, ObservabilityValidationError
+from app.middleware.auth import login_required
 from app.services.observability_service import ObservabilityService
 
 observability_bp = Blueprint("observability", __name__, url_prefix="/observability")
@@ -35,6 +36,7 @@ def handle_observability_error(error: ObservabilityServiceError):
 
 
 @observability_bp.post("/audit-log")
+@login_required
 def create_audit_log():
     """Create an audit log entry."""
     payload = request.get_json(silent=True) or {}
@@ -64,6 +66,7 @@ def create_audit_log():
 
 
 @observability_bp.get("/audit-logs")
+@login_required
 def list_audit_logs():
     """List audit logs with optional filters."""
     event_type = request.args.get("event_type")
@@ -102,6 +105,7 @@ def list_audit_logs():
 
 
 @observability_bp.get("/metrics/migration/<int:migration_id>")
+@login_required
 def get_migration_metrics(migration_id: int):
     """Get metrics for a specific migration."""
     try:
@@ -112,6 +116,7 @@ def get_migration_metrics(migration_id: int):
 
 
 @observability_bp.get("/metrics/system")
+@login_required
 def get_system_metrics():
     """Get overall system health metrics."""
     try:
@@ -122,6 +127,7 @@ def get_system_metrics():
 
 
 @observability_bp.post("/cloudwatch/metric")
+@login_required
 def send_cloudwatch_metric():
     """Send a custom metric to CloudWatch."""
     payload = request.get_json(silent=True) or {}
@@ -140,6 +146,7 @@ def send_cloudwatch_metric():
 
 
 @observability_bp.post("/cloudwatch/log")
+@login_required
 def send_cloudwatch_log():
     """Send a log entry to CloudWatch Logs."""
     payload = request.get_json(silent=True) or {}

@@ -1,4 +1,4 @@
-import { ChevronLeft, ChevronRight, ClipboardCheck, Cloud, Database, LayoutDashboard, Server, Activity, GitCompare, Settings, ShieldCheck, Zap, BarChart3, RotateCcw, User, HelpCircle } from "lucide-react";
+import { ChevronLeft, ChevronRight, ClipboardCheck, Cloud, Database, LayoutDashboard, Server, Activity, GitCompare, Settings, ShieldCheck, Zap, BarChart3, RotateCcw, User } from "lucide-react";
 import { useEffect, type ReactNode } from "react";
 import { NavLink } from "react-router-dom";
 
@@ -6,17 +6,17 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
 const navigationItems = [
-  { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard, category: "Overview" },
-  { label: "Migrations", href: "/migrations", icon: Database, category: "Overview" },
-  { label: "CDC Replication", href: "/cdc", icon: Zap, category: "Data" },
-  { label: "Schema Drift", href: "/schema-drift", icon: GitCompare, category: "Data" },
-  { label: "Approvals", href: "/approvals", icon: ShieldCheck, category: "Data" },
-  { label: "Rollback", href: "/rollback", icon: RotateCcw, category: "Data" },
-  { label: "Databases", href: "/database-configs", icon: Server, category: "Infrastructure" },
-  { label: "AWS Connections", href: "/aws-connections", icon: Cloud, category: "Infrastructure" },
-  { label: "ECS Tasks", href: "/ecs", icon: Activity, category: "Infrastructure" },
-  { label: "Pre-flight", href: "/preflight", icon: ClipboardCheck, category: "Infrastructure" },
-  { label: "Observability", href: "/observability", icon: BarChart3, category: "Monitoring" },
+  { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard, category: "Overview", color: "text-blue-500" },
+  { label: "Migrations", href: "/migrations", icon: Database, category: "Overview", color: "text-violet-500" },
+  { label: "CDC Replication", href: "/cdc", icon: Zap, category: "Data", color: "text-amber-500" },
+  { label: "Schema Drift", href: "/schema-drift", icon: GitCompare, category: "Data", color: "text-rose-500" },
+  { label: "Approvals", href: "/approvals", icon: ShieldCheck, category: "Data", color: "text-emerald-500" },
+  { label: "Rollback", href: "/rollback", icon: RotateCcw, category: "Data", color: "text-orange-500" },
+  { label: "Databases", href: "/database-configs", icon: Server, category: "Infrastructure", color: "text-cyan-500" },
+  { label: "AWS Connections", href: "/aws-connections", icon: Cloud, category: "Infrastructure", color: "text-indigo-500" },
+  { label: "ECS Tasks", href: "/ecs", icon: Activity, category: "Infrastructure", color: "text-pink-500" },
+  { label: "Pre-flight", href: "/preflight", icon: ClipboardCheck, category: "Infrastructure", color: "text-teal-500" },
+  { label: "Observability", href: "/observability", icon: BarChart3, category: "Monitoring", color: "text-purple-500" },
 ];
 
 const secondaryNavItems = [
@@ -66,16 +66,20 @@ function SidebarContent({ isCollapsed, onToggle }: { isCollapsed: boolean; onTog
                   className={({ isActive }) =>
                     cn(
                       "group flex h-10 items-center gap-3 rounded-xl px-3 text-sm font-medium transition-all duration-200",
-                      isActive ? "bg-primary/10 text-primary shadow-sm" : "text-muted-foreground hover:bg-muted/50 hover:text-foreground",
+                      isActive
+                        ? "bg-gradient-to-r from-primary/10 to-blue-500/5 text-primary shadow-sm"
+                        : "text-muted-foreground hover:bg-muted/50 hover:text-foreground",
                       isCollapsed && "justify-center px-0",
                     )
                   }
                 >
                   {({ isActive }: { isActive: boolean }) => (
                     <>
-                      <item.icon
-                        className={cn("h-4 w-4 transition-colors", isActive ? "text-primary" : "text-muted-foreground group-hover:text-foreground")}
-                      />
+                      <div className={cn("rounded-lg p-1.5 transition-all duration-200", isActive ? "bg-primary/15 scale-110" : "bg-transparent group-hover:bg-muted/60 group-hover:scale-105")}>
+                        <item.icon
+                          className={cn("h-4 w-4 transition-all duration-200", isActive ? item.color : "text-muted-foreground group-hover:text-foreground")}
+                        />
+                      </div>
                       {!isCollapsed ? <span className="transition-colors">{item.label}</span> : null}
                     </>
                   )}
@@ -106,22 +110,10 @@ function SidebarContent({ isCollapsed, onToggle }: { isCollapsed: boolean; onTog
             )}
           </NavLink>
         ))}
-        <a
-          href="https://docs.cloudbridge.io/help"
-          target="_blank"
-          rel="noopener noreferrer"
-          className={cn(
-            "group flex h-10 items-center gap-3 rounded-xl px-3 text-sm font-medium transition-all duration-200 text-muted-foreground hover:bg-muted/50 hover:text-foreground",
-            isCollapsed && "justify-center px-0",
-          )}
-        >
-          <HelpCircle className="h-4 w-4 text-muted-foreground group-hover:text-foreground" />
-          {!isCollapsed ? <span className="transition-colors">Help</span> : null}
-        </a>
         <Button
           variant="ghost"
           size="icon"
-          className="w-full justify-center hover:bg-muted/50"
+          className="w-full justify-center hover:bg-muted/50 transition-transform hover:scale-105"
           onClick={() => onToggle(!isCollapsed)}
         >
           {isCollapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}

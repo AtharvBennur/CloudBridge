@@ -1,0 +1,17 @@
+schema_version: 1
+module_path: backend/observability_domain
+title: Observability, Health & Preflight Endpoints
+scope:
+    - backend/app/routes/observability.py
+    - backend/app/routes/preflight.py
+    - backend/app/routes/health.py
+    - backend/app/routes/websocket.py
+    - backend/app/services/observability_service.py
+    - backend/app/services/preflight_service.py
+    - backend/app/services/websocket_service.py
+source_files: []
+depends_on: []
+related_to:
+    - path: backend/ecs_domain
+    - path: backend/migration_domain
+    - path: frontend

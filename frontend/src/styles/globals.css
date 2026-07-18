@@ -21,6 +21,28 @@
     --border: 214 32% 88%;
     --input: 214 32% 88%;
     --ring: 199 89% 35%;
+
+    /* Enterprise accent colors */
+    --violet: 262 83% 58%;
+    --violet-foreground: 262 83% 96%;
+    --emerald: 160 84% 39%;
+    --emerald-foreground: 160 84% 96%;
+    --amber: 38 92% 50%;
+    --amber-foreground: 38 92% 12%;
+    --rose: 346 77% 55%;
+    --rose-foreground: 346 77% 96%;
+    --cyan: 187 85% 43%;
+    --cyan-foreground: 187 85% 96%;
+    --indigo: 239 84% 67%;
+    --indigo-foreground: 239 84% 96%;
+    --pink: 330 81% 60%;
+    --pink-foreground: 330 81% 96%;
+    --teal: 173 80% 40%;
+    --teal-foreground: 173 80% 96%;
+    --orange: 25 95% 53%;
+    --orange-foreground: 25 95% 96%;
+    --purple: 271 91% 65%;
+    --purple-foreground: 271 91% 96%;
   }
 
   .dark {
@@ -41,6 +63,28 @@
     --border: 217 19% 22%;
     --input: 217 19% 22%;
     --ring: 190 82% 45%;
+
+    /* Enterprise accent colors - dark mode */
+    --violet: 262 83% 68%;
+    --violet-foreground: 262 83% 96%;
+    --emerald: 160 84% 49%;
+    --emerald-foreground: 160 84% 96%;
+    --amber: 38 92% 60%;
+    --amber-foreground: 38 92% 12%;
+    --rose: 346 77% 65%;
+    --rose-foreground: 346 77% 96%;
+    --cyan: 187 85% 53%;
+    --cyan-foreground: 187 85% 96%;
+    --indigo: 239 84% 77%;
+    --indigo-foreground: 239 84% 96%;
+    --pink: 330 81% 70%;
+    --pink-foreground: 330 81% 96%;
+    --teal: 173 80% 50%;
+    --teal-foreground: 173 80% 96%;
+    --orange: 25 95% 63%;
+    --orange-foreground: 25 95% 96%;
+    --purple: 271 91% 75%;
+    --purple-foreground: 271 91% 96%;
   }
 
   * {
@@ -76,5 +120,58 @@
 
   ::-webkit-scrollbar-thumb:hover {
     background: hsl(var(--muted-foreground) / 0.5);
+  }
+
+  /* Enterprise shimmer animation */
+  @keyframes shimmer {
+    0% { background-position: -200% 0; }
+    100% { background-position: 200% 0; }
+  }
+
+  /* Subtle pulse for live indicators */
+  @keyframes pulse-soft {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.6; }
+  }
+
+  /* Gradient shift animation */
+  @keyframes gradient-shift {
+    0% { background-position: 0% 50%; }
+    50% { background-position: 100% 50%; }
+    100% { background-position: 0% 50%; }
+  }
+
+  /* Float animation for decorative elements */
+  @keyframes float {
+    0%, 100% { transform: translateY(0px); }
+    50% { transform: translateY(-4px); }
+  }
+
+  /* Glow pulse for important indicators */
+  @keyframes glow-pulse {
+    0%, 100% { box-shadow: 0 0 0 0 hsl(var(--primary) / 0.4); }
+    50% { box-shadow: 0 0 12px 4px hsl(var(--primary) / 0.15); }
+  }
+
+  .animate-shimmer {
+    background-size: 200% 100%;
+    animation: shimmer 2s linear infinite;
+  }
+
+  .animate-pulse-soft {
+    animation: pulse-soft 2s ease-in-out infinite;
+  }
+
+  .animate-gradient {
+    background-size: 200% 200%;
+    animation: gradient-shift 4s ease infinite;
+  }
+
+  .animate-float {
+    animation: float 3s ease-in-out infinite;
+  }
+
+  .animate-glow {
+    animation: glow-pulse 2s ease-in-out infinite;
   }
 }

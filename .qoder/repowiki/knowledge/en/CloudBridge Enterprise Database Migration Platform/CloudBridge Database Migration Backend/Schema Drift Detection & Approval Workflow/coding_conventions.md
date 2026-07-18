@@ -1,0 +1,6 @@
+- Request payloads are parsed through frozen dataclasses with a `from_payload(cls, payload)` classmethod that validates types and raises `ValueError`, keeping route handlers thin.
+- Responses are produced by frozen dataclasses exposing `from_model(model)` and `to_dict()` so routes return plain dicts without leaking ORM objects.
+- Each blueprint defines its own `@bp.errorhandler(…)` mapping domain exceptions to `{"error": {"message": …}}` JSON bodies at consistent HTTP status codes.
+- Service methods raise typed exceptions (`SchemaDriftServiceError`, `SchemaSnapshotNotFoundError`, `SchemaApprovalServiceError`) rather than returning error tuples, letting routes centralize serialization.
+- Structured logging goes through a private `_log_info(self, message, *details)` helper that falls back to `current_app.logger` when no injected logger is provided.
+- Domain enums are plain classes with uppercase string constants plus a `VALUES` set, used both as DB column defaults and in risk-level comparisons instead of Python `Enum`.

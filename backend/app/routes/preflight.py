@@ -1,5 +1,6 @@
 from flask import Blueprint, jsonify, request
 
+from app.middleware.auth import login_required
 from app.models.aws_connection import AWSConnection
 from app.models.database_config import DatabaseConfig
 from app.services.preflight_service import PreflightService
@@ -8,7 +9,8 @@ preflight_bp = Blueprint("preflight", __name__, url_prefix="/preflight")
 preflight_service = PreflightService()
 
 
-@preflight_bp.post("")
+@preflight_bp.post('')
+@login_required
 def run_preflight():
     payload = request.get_json(silent=True) or {}
     aws_connection_id = payload.get("aws_connection_id")

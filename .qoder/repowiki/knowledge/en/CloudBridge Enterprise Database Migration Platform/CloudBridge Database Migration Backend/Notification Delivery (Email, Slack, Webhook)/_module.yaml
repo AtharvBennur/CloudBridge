@@ -1,0 +1,14 @@
+schema_version: 1
+module_path: backend/notification_domain
+title: Notification Delivery (Email, Slack, Webhook)
+scope:
+    - backend/app/routes/notification.py
+    - backend/app/services/notification_service.py
+    - backend/app/schemas/notification.py
+    - backend/app/models/notification.py
+source_files: []
+depends_on: []
+related_to:
+    - path: backend/migration_domain
+    - path: backend/schema_domain
+    - path: frontend

@@ -1,0 +1,1 @@
+Flask application that wires together domain blueprints for AWS connections, database onboarding, CDC, schema drift/approval, ECS task orchestration, migrations, notifications, and observability behind a shared auth, DB, and WebSocket layer.

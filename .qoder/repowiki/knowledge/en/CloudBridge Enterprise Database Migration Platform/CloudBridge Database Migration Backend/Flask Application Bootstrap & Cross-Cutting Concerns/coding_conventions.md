@@ -1,0 +1,3 @@
+- Configuration values are read exclusively through `os.getenv` with explicit defaults, grouped into frozen `BaseConfig` dataclass fields rather than mutable Flask `app.config` assignments.
+- Cross-cutting concerns expose a single `configure_*` / `register_*` function taking a `Flask` instance and registering handlers via decorators (`@app.errorhandler`, `@app.before_request`, `@app.after_request`) instead of using blueprints or class-based initializers.
+- Environment variables follow UPPER_SNAKE_CASE naming and are parsed with small helpers `_get_bool` / `_get_int` for typed conversion rather than raw string reads.

@@ -6,7 +6,7 @@ Premium enterprise login page with modern branding and animations.
 import { FormEvent, useMemo, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { ArrowRight, Cloud, LockKeyhole, Database, Shield, Zap, ChevronRight } from "lucide-react";
-import { Navigate, useLocation, useNavigate } from "react-router-dom";
+import { Navigate, useLocation, useNavigate, Link } from "react-router-dom";
 
 import { ThemeToggle } from "@/components/theme/ThemeToggle";
 import { Button } from "@/components/ui/button";
@@ -140,9 +140,9 @@ export function LoginPage() {
   };
 
   const features = [
-    { icon: Database, title: "CDC Replication", description: "Real-time change data capture" },
-    { icon: Shield, title: "Schema Drift Detection", description: "Automated monitoring & alerts" },
-    { icon: Zap, title: "ECS Execution", description: "Scalable migration workers" },
+    { icon: Database, title: "CDC Replication", description: "Real-time change data capture", gradient: "from-blue-500 to-cyan-400" },
+    { icon: Shield, title: "Schema Drift Detection", description: "Automated monitoring & alerts", gradient: "from-violet-500 to-purple-400" },
+    { icon: Zap, title: "ECS Execution", description: "Scalable migration workers", gradient: "from-amber-500 to-orange-400" },
   ];
 
   return (
@@ -225,7 +225,7 @@ export function LoginPage() {
                     transition={{ delay: 0.5 + index * 0.1 }}
                     className="flex items-start gap-4 p-4 rounded-2xl border border-border/10 bg-background/50 backdrop-blur-sm hover:bg-muted/50 transition-colors group dark:border-white/10 dark:bg-white/5 dark:hover:bg-white/10"
                   >
-                    <div className="h-10 w-10 rounded-xl bg-primary/10 flex items-center justify-center text-primary group-hover:bg-primary/20 transition-colors">
+                    <div className={`h-10 w-10 rounded-xl bg-gradient-to-br ${feature.gradient} flex items-center justify-center text-white shadow-md group-hover:scale-110 transition-all duration-300`}>
                       <feature.icon className="h-5 w-5" />
                     </div>
                     <div>
@@ -296,9 +296,9 @@ export function LoginPage() {
                       <div className="space-y-2">
                         <div className="flex items-center justify-between">
                           <Label htmlFor="password" className="text-foreground/80 dark:text-white/80 text-sm font-medium">Password</Label>
-                          <a href="#" className="text-sm text-primary hover:text-primary/80 transition-colors">
+                          <Link to="/forgot-password" className="text-sm text-primary hover:text-primary/80 transition-colors">
                             Forgot password?
-                          </a>
+                          </Link>
                         </div>
                         <Input
                           id="password"
@@ -370,11 +370,17 @@ export function LoginPage() {
                       {isSubmitting ? "Signing in..." : "Sign in with Google"}
                     </Button>
 
-                    <div className="text-center text-sm text-muted-foreground pt-4 border-t border-border/10 dark:border-white/10">
+                    <div className="text-center text-sm text-muted-foreground pt-4 border-t border-border/10 dark:border-white/10 space-y-2">
                       <span className="flex items-center justify-center gap-2">
                         <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
                         Google OAuth Authentication
                       </span>
+                      <p>
+                        Don't have an account?{" "}
+                        <Link to="/register" className="text-primary font-medium hover:text-primary/80 transition-colors">
+                          Create account
+                        </Link>
+                      </p>
                     </div>
                   </CardContent>
                 </div>

@@ -1,0 +1,1 @@
+Flask Blueprints + SQLAlchemy ORM for persistence; botocore `ClientError` for AWS SDK failures; `AWSClient` wrapper (in `app.utils`) provides simulated-mode STS/Secrets Manager clients so connect/validate/disconnect can run without real AWS credentials during tests.

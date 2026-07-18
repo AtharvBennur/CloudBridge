@@ -1,0 +1,1 @@
+Flask API and service layer that manages per-user notification configurations and dispatches notifications via email, Slack webhooks, and generic HTTP webhooks.

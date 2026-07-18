@@ -16,6 +16,7 @@ Migration Checkpoint Model
 from flask import Blueprint, jsonify, request
 
 from app.exceptions.rollback import CheckpointNotFoundError, RollbackServiceError, RollbackValidationError
+from app.middleware.auth import login_required
 from app.services.rollback_service import RollbackService
 
 rollback_bp = Blueprint("rollback", __name__, url_prefix="/rollback")
@@ -41,6 +42,7 @@ def handle_rollback_error(error: RollbackServiceError):
 
 
 @rollback_bp.post("/checkpoint")
+@login_required
 def create_checkpoint():
     """Create a rollback checkpoint for a migration."""
     payload = request.get_json(silent=True) or {}
@@ -70,6 +72,7 @@ def create_checkpoint():
 
 
 @rollback_bp.post("/to-checkpoint/<int:migration_id>")
+@login_required
 def rollback_to_checkpoint(migration_id: int):
     """Rollback a migration to a specific checkpoint."""
     payload = request.get_json(silent=True) or {}
@@ -86,6 +89,7 @@ def rollback_to_checkpoint(migration_id: int):
 
 
 @rollback_bp.post("/resume/<int:migration_id>")
+@login_required
 def resume_from_checkpoint(migration_id: int):
     """Resume a migration from the latest or specific checkpoint."""
     payload = request.get_json(silent=True) or {}
@@ -99,6 +103,7 @@ def resume_from_checkpoint(migration_id: int):
 
 
 @rollback_bp.post("/restart/<int:migration_id>")
+@login_required
 def restart_migration(migration_id: int):
     """Restart a migration from the beginning."""
     try:
@@ -109,6 +114,7 @@ def restart_migration(migration_id: int):
 
 
 @rollback_bp.get("/checkpoints/<int:migration_id>")
+@login_required
 def get_checkpoints(migration_id: int):
     """Get all available checkpoints for a migration."""
     try:
@@ -130,6 +136,7 @@ def get_checkpoints(migration_id: int):
 
 
 @rollback_bp.get("/recovery-options/<int:migration_id>")
+@login_required
 def get_recovery_options(migration_id: int):
     """Get available recovery options for a migration."""
     try:
@@ -140,6 +147,7 @@ def get_recovery_options(migration_id: int):
 
 
 @rollback_bp.delete("/checkpoint/<int:checkpoint_id>")
+@login_required
 def delete_checkpoint(checkpoint_id: int):
     """Delete a checkpoint."""
     try:
@@ -150,6 +158,7 @@ def delete_checkpoint(checkpoint_id: int):
 
 
 @rollback_bp.post("/cleanup-checkpoints/<int:migration_id>")
+@login_required
 def cleanup_checkpoints(migration_id: int):
     """Cleanup old checkpoints, keeping only the most recent ones."""
     payload = request.get_json(silent=True) or {}

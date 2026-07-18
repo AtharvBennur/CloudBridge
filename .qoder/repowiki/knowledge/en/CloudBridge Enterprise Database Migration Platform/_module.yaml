@@ -1,0 +1,11 @@
+schema_version: 1
+module_path: ""
+title: CloudBridge Enterprise Database Migration Platform
+scope:
+    - .gitignore
+    - README.md
+    - docker-compose.yml
+    - .env.example
+source_files: []
+depends_on: []
+related_to: []

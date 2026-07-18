@@ -6,6 +6,8 @@ import { AWSConnectionPage } from "@/pages/AWSConnectionPage";
 import { DatabaseConfigPage } from "@/pages/DatabaseConfigPage";
 import { DashboardPage } from "@/pages/DashboardPage";
 import { LoginPage } from "@/pages/LoginPage";
+import { RegisterPage } from "@/pages/RegisterPage";
+import { ForgotPasswordPage } from "@/pages/ForgotPasswordPage";
 import { MigrationCreatePage } from "@/pages/MigrationCreatePage";
 import { MigrationDetailPage } from "@/pages/MigrationDetailPage";
 import { MigrationEditPage } from "@/pages/MigrationEditPage";
@@ -29,6 +31,8 @@ export function App() {
       <Routes>
         <Route path="/" element={<Navigate to="/dashboard" replace />} />
         <Route path="/login" element={<LoginPage />} />
+        <Route path="/register" element={<RegisterPage />} />
+        <Route path="/forgot-password" element={<ForgotPasswordPage />} />
         <Route
           path="/dashboard"
           element={

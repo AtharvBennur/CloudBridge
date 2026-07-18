@@ -16,6 +16,7 @@ ECS Task Model
 from flask import Blueprint, jsonify, request
 
 from app.exceptions.ecs import ECSTaskNotFoundError, ECSValidationError, ECSServiceError
+from app.middleware.auth import login_required
 from app.schemas.ecs import CreateECSTaskRequest, ECSTaskResponse
 from app.services.ecs_service import ECSService
 
@@ -42,6 +43,7 @@ def handle_ecs_error(error: ECSServiceError):
 
 
 @ecs_bp.post("/tasks")
+@login_required
 def create_ecs_task():
     """Create a new ECS task for migration execution."""
     payload = request.get_json(silent=True)
@@ -64,6 +66,7 @@ def create_ecs_task():
 
 
 @ecs_bp.post("/tasks/<int:task_id>/start")
+@login_required
 def start_ecs_task(task_id: int):
     """Start an ECS task."""
     try:
@@ -74,6 +77,7 @@ def start_ecs_task(task_id: int):
 
 
 @ecs_bp.post("/tasks/<int:task_id>/stop")
+@login_required
 def stop_ecs_task(task_id: int):
     """Stop a running ECS task."""
     payload = request.get_json(silent=True) or {}
@@ -86,6 +90,7 @@ def stop_ecs_task(task_id: int):
 
 
 @ecs_bp.get("/tasks/<int:task_id>/status")
+@login_required
 def get_ecs_task_status(task_id: int):
     """Get the current status of an ECS task."""
     try:
@@ -96,6 +101,7 @@ def get_ecs_task_status(task_id: int):
 
 
 @ecs_bp.get("/tasks/<int:task_id>/logs")
+@login_required
 def get_ecs_task_logs(task_id: int):
     """Get CloudWatch logs for an ECS task."""
     tail_lines = request.args.get("tail_lines", 100, type=int)
@@ -107,6 +113,7 @@ def get_ecs_task_logs(task_id: int):
 
 
 @ecs_bp.post("/tasks/<int:task_id>/retry")
+@login_required
 def retry_ecs_task(task_id: int):
     """Retry a failed ECS task."""
     try:
@@ -117,6 +124,7 @@ def retry_ecs_task(task_id: int):
 
 
 @ecs_bp.delete("/tasks/<int:task_id>")
+@login_required
 def delete_ecs_task(task_id: int):
     """Delete an ECS task record."""
     try:
@@ -127,6 +135,7 @@ def delete_ecs_task(task_id: int):
 
 
 @ecs_bp.get("/tasks")
+@login_required
 def list_ecs_tasks():
     """List all ECS tasks for a migration."""
     migration_id = request.args.get("migration_id", type=int)
@@ -144,6 +153,7 @@ def list_ecs_tasks():
 
 
 @ecs_bp.get("/tasks/<int:task_id>")
+@login_required
 def get_ecs_task(task_id: int):
     """Get a specific ECS task by ID."""
     from app.models.ecs_task import ECSTask

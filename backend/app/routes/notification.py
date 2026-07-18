@@ -16,6 +16,7 @@ Notification Model
 from flask import Blueprint, jsonify, request
 
 from app.exceptions.notification import NotificationConfigNotFoundError, NotificationDeliveryError, NotificationServiceError, NotificationValidationError
+from app.middleware.auth import login_required
 from app.schemas.notification import CreateNotificationConfigRequest, SendNotificationRequest, NotificationConfigResponse, NotificationResponse
 from app.services.notification_service import NotificationService
 
@@ -48,6 +49,7 @@ def handle_notification_error(error: NotificationServiceError):
 
 
 @notification_bp.post("/config")
+@login_required
 def create_notification_config():
     """Create a notification configuration for a user."""
     payload = request.get_json(silent=True)
@@ -69,6 +71,7 @@ def create_notification_config():
 
 
 @notification_bp.get("/config/<int:config_id>")
+@login_required
 def get_notification_config(config_id: int):
     """Get a notification configuration by ID."""
     from app.models.notification import NotificationConfig
@@ -81,6 +84,7 @@ def get_notification_config(config_id: int):
 
 
 @notification_bp.get("/config/user/<user_id>")
+@login_required
 def get_user_notification_configs(user_id: str):
     """Get all notification configurations for a user."""
     try:
@@ -91,6 +95,7 @@ def get_user_notification_configs(user_id: str):
 
 
 @notification_bp.delete("/config/<int:config_id>")
+@login_required
 def delete_notification_config(config_id: int):
     """Delete a notification configuration."""
     try:
@@ -101,6 +106,7 @@ def delete_notification_config(config_id: int):
 
 
 @notification_bp.post("/send")
+@login_required
 def send_notification():
     """Send a notification to all subscribed users."""
     payload = request.get_json(silent=True)
@@ -123,6 +129,7 @@ def send_notification():
 
 
 @notification_bp.post("/retry-failed")
+@login_required
 def retry_failed_notifications():
     """Retry failed notifications."""
     try:
@@ -133,6 +140,7 @@ def retry_failed_notifications():
 
 
 @notification_bp.get("/history")
+@login_required
 def get_notification_history():
     """Get notification history with optional filters."""
     user_id = request.args.get("user_id")
@@ -153,6 +161,7 @@ def get_notification_history():
 
 
 @notification_bp.get("/history/<int:notification_id>")
+@login_required
 def get_notification(notification_id: int):
     """Get a specific notification by ID."""
     from app.models.notification import Notification

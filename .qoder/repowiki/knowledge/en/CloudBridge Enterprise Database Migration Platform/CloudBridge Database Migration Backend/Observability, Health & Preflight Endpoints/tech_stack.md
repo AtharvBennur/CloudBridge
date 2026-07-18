@@ -1,0 +1,1 @@
+Flask Blueprints + Flask-SocketIO for HTTP/WebSocket transport; boto3 via `app.utils.aws_client.AWSClient` for CloudWatch Metrics/Logs and Secrets Manager; SQLAlchemy models (`AuditLog`, `MigrationJob`, `CDCEvent`, `ECSTask`, `AWSConnection`, `DatabaseConfig`) queried through `app.extensions.db`.

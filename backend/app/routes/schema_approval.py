@@ -16,6 +16,7 @@ Schema Drift Service
 from flask import Blueprint, jsonify, request
 
 from app.exceptions.schema_approval import SchemaApprovalServiceError, SchemaApprovalValidationError
+from app.middleware.auth import login_required
 from app.services.schema_approval_service import SchemaApprovalService
 
 schema_approval_bp = Blueprint("schema_approval", __name__, url_prefix="/schema-approval")
@@ -35,6 +36,7 @@ def handle_schema_approval_error(error: SchemaApprovalServiceError):
 
 
 @schema_approval_bp.post("/check/<int:migration_id>")
+@login_required
 def check_for_approval(migration_id: int):
     """Check if migration requires schema approval and pause if needed."""
     try:
@@ -45,6 +47,7 @@ def check_for_approval(migration_id: int):
 
 
 @schema_approval_bp.post("/approve-and-resume/<int:migration_id>")
+@login_required
 def approve_and_resume(migration_id: int):
     """Approve schema changes and resume migration."""
     payload = request.get_json(silent=True) or {}
@@ -62,6 +65,7 @@ def approve_and_resume(migration_id: int):
 
 
 @schema_approval_bp.post("/auto-apply/<int:migration_id>")
+@login_required
 def auto_apply_safe(migration_id: int):
     """Automatically apply safe schema changes."""
     try:
@@ -72,6 +76,7 @@ def auto_apply_safe(migration_id: int):
 
 
 @schema_approval_bp.get("/summary/<int:migration_id>")
+@login_required
 def get_approval_summary(migration_id: int):
     """Get approval summary for a migration."""
     try:
@@ -82,6 +87,7 @@ def get_approval_summary(migration_id: int):
 
 
 @schema_approval_bp.post("/bulk-approve/<int:migration_id>")
+@login_required
 def bulk_approve(migration_id: int):
     """Bulk approve schema changes up to a risk level."""
     payload = request.get_json(silent=True) or {}

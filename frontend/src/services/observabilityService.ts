@@ -32,15 +32,29 @@ export interface MigrationMetrics {
 }
 
 export interface SystemMetrics {
-  total_migrations: number;
-  running_migrations: number;
-  completed_migrations: number;
-  failed_migrations: number;
-  total_aws_connections: number;
-  total_database_configs: number;
-  active_ecs_tasks: number;
-  total_audit_logs: number;
-  avg_migration_duration_seconds: number;
+  migrations: {
+    total: number;
+    running: number;
+    failed: number;
+    completed: number;
+  };
+  aws_connections: {
+    total: number;
+    active: number;
+  };
+  database_configs: {
+    total: number;
+  };
+  recent_errors: Array<{
+    event_type: string;
+    description: string;
+    occurred_at: string;
+  }>;
+  recent_warnings: Array<{
+    event_type: string;
+    description: string;
+    occurred_at: string;
+  }>;
 }
 
 export const observabilityService = {

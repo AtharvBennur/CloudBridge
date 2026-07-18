@@ -16,6 +16,7 @@ CDC Model
 from flask import Blueprint, jsonify, request
 
 from app.exceptions.cdc import CDCConfigNotFoundError, CDCValidationError, CDCServiceError
+from app.middleware.auth import login_required
 from app.schemas.cdc import CDCConfigResponse, CreateCDCConfigRequest, UpdateCDCConfigRequest, CDCEventResponse
 from app.services.cdc_service import CDCService
 from app.workers.manager import worker_manager
@@ -43,6 +44,7 @@ def handle_cdc_error(error: CDCServiceError):
 
 
 @cdc_bp.post("/config")
+@login_required
 def create_cdc_config():
     """Create a new CDC configuration for a migration job."""
     payload = request.get_json(silent=True)
@@ -59,6 +61,7 @@ def create_cdc_config():
 
 
 @cdc_bp.get("/config/<int:migration_id>")
+@login_required
 def get_cdc_config(migration_id: int):
     """Get CDC configuration for a migration job."""
     try:
@@ -69,6 +72,7 @@ def get_cdc_config(migration_id: int):
 
 
 @cdc_bp.put("/config/<int:migration_id>")
+@login_required
 def update_cdc_config(migration_id: int):
     """Update CDC configuration for a migration job."""
     payload = request.get_json(silent=True)
@@ -80,6 +84,7 @@ def update_cdc_config(migration_id: int):
 
 
 @cdc_bp.delete("/config/<int:migration_id>")
+@login_required
 def delete_cdc_config(migration_id: int):
     """Delete CDC configuration for a migration job."""
     try:
@@ -90,6 +95,7 @@ def delete_cdc_config(migration_id: int):
 
 
 @cdc_bp.post("/start")
+@login_required
 def start_cdc():
     """Start CDC replication for a migration job."""
     payload = request.get_json(silent=True) or {}
@@ -131,6 +137,7 @@ def start_cdc():
 
 
 @cdc_bp.post("/pause")
+@login_required
 def pause_cdc():
     """Pause CDC replication for a migration job."""
     payload = request.get_json(silent=True) or {}
@@ -158,6 +165,7 @@ def pause_cdc():
 
 
 @cdc_bp.post("/resume")
+@login_required
 def resume_cdc():
     """Resume CDC replication for a migration job."""
     payload = request.get_json(silent=True) or {}
@@ -188,6 +196,7 @@ def resume_cdc():
 
 
 @cdc_bp.post("/stop")
+@login_required
 def stop_cdc():
     """Stop CDC replication for a migration job."""
     payload = request.get_json(silent=True) or {}
@@ -215,6 +224,7 @@ def stop_cdc():
 
 
 @cdc_bp.get("/events/<int:migration_id>")
+@login_required
 def get_cdc_events(migration_id: int):
     """Get CDC events for a migration job."""
     try:
@@ -236,6 +246,7 @@ def get_cdc_events(migration_id: int):
 
 
 @cdc_bp.get("/statistics/<int:migration_id>")
+@login_required
 def get_cdc_statistics(migration_id: int):
     """Get CDC statistics for a migration job."""
     try:

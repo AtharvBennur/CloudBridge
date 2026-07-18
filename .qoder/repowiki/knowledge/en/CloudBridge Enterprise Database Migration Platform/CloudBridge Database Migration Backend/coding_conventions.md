@@ -1,0 +1,4 @@
+- Each feature follows a routes/blueprint → service → model/schemas layered split, with the blueprint importing only its sibling service and never models directly.
+- Domain state lives in `app/models/<feature>.py` as SQLAlchemy declarative classes; request/response contracts live in `app/schemas/<feature>.py` as Pydantic-style dataclasses.
+- External I/O (AWS, email, Slack, webhooks) is wrapped in `app/services/*_service.py` and accessed by routes exclusively through those services.
+- Cross-domain side effects are published via the shared `AuditLog` model rather than direct calls between services.

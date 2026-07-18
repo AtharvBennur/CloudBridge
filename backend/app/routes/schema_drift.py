@@ -16,6 +16,7 @@ Schema Snapshot Model
 from flask import Blueprint, jsonify, request
 
 from app.exceptions.schema_drift import SchemaSnapshotNotFoundError, SchemaDriftValidationError, SchemaDriftServiceError
+from app.middleware.auth import login_required
 from app.schemas.schema_drift import (
     CreateSnapshotRequest,
     CompareSchemasRequest,
@@ -49,6 +50,7 @@ def handle_schema_drift_error(error: SchemaDriftServiceError):
 
 
 @schema_drift_bp.post("/snapshots")
+@login_required
 def create_snapshot():
     """Create a new schema snapshot."""
     payload = request.get_json(silent=True)
@@ -66,6 +68,7 @@ def create_snapshot():
 
 
 @schema_drift_bp.get("/snapshots/<int:snapshot_id>")
+@login_required
 def get_snapshot(snapshot_id: int):
     """Get a schema snapshot by ID."""
     from app.models.schema_snapshot import SchemaSnapshot
@@ -78,6 +81,7 @@ def get_snapshot(snapshot_id: int):
 
 
 @schema_drift_bp.get("/snapshots")
+@login_required
 def list_snapshots():
     """List all schema snapshots for a migration."""
     migration_id = request.args.get("migration_id", type=int)
@@ -95,6 +99,7 @@ def list_snapshots():
 
 
 @schema_drift_bp.post("/compare")
+@login_required
 def compare_schemas():
     """Compare two schema snapshots and detect drift."""
     payload = request.get_json(silent=True)
@@ -111,6 +116,7 @@ def compare_schemas():
 
 
 @schema_drift_bp.get("/drift-events")
+@login_required
 def list_drift_events():
     """List schema drift events for a migration."""
     migration_id = request.args.get("migration_id", type=int)
@@ -127,6 +133,7 @@ def list_drift_events():
 
 
 @schema_drift_bp.get("/drift-events/<int:event_id>")
+@login_required
 def get_drift_event(event_id: int):
     """Get a specific drift event by ID."""
     from app.models.schema_snapshot import SchemaDriftEvent
@@ -139,6 +146,7 @@ def get_drift_event(event_id: int):
 
 
 @schema_drift_bp.post("/drift-events/<int:event_id>/approve")
+@login_required
 def approve_drift_event(event_id: int):
     """Approve a schema drift event."""
     payload = request.get_json(silent=True)
@@ -151,6 +159,7 @@ def approve_drift_event(event_id: int):
 
 
 @schema_drift_bp.post("/drift-events/<int:event_id>/reject")
+@login_required
 def reject_drift_event(event_id: int):
     """Reject a schema drift event."""
     payload = request.get_json(silent=True)
@@ -163,6 +172,7 @@ def reject_drift_event(event_id: int):
 
 
 @schema_drift_bp.post("/drift-events/<int:event_id>/ignore")
+@login_required
 def ignore_drift_event(event_id: int):
     """Ignore a schema drift event."""
     try:

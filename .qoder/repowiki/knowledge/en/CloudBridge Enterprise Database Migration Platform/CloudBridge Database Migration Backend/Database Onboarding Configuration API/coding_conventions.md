@@ -1,0 +1,4 @@
+- Request/response contracts are frozen dataclasses with explicit `from_payload` / `to_dict` / `from_model` factory methods rather than Pydantic or marshmallow validators.
+- Domain errors are raised as plain `ValueError` subclasses (`DatabaseConfigValidationError`, `DatabaseConfigNotFoundError`) and caught once at the Blueprint level via `@bp.errorhandler` to return uniform `{"error": {"message": ...}}` JSON.
+- Optional string fields are normalized by stripping whitespace and coerced to `None` when empty, while required strings raise `ValueError("... is required.")` during payload parsing.
+- The `purpose` field is upper-cased and validated against `DatabaseConfigType.VALUES`; password acceptance is conditional on purpose being SOURCE versus DESTINATION.
