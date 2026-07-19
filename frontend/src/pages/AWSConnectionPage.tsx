@@ -617,6 +617,9 @@ export function AWSConnectionPage() {
                             if (e.key === "Escape") { setEditingRoleId(null); setInlineRoleArn(""); }
                           }}
                         />
+                        <p className="text-[11px] text-muted-foreground">
+                          Paste the <span className="font-mono font-medium text-foreground">MigrationRoleArn</span> output from the CloudFormation stack (not the Execution or Task role).
+                        </p>
                         <div className="flex gap-2">
                           <Button
                             size="sm"

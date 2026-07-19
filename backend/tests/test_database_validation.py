@@ -263,6 +263,45 @@ def test_mysql_source_validation(mock_tcp, mock_get_validator):
 
 @patch("app.services.database_validation_service.get_validator")
 @patch("app.services.database_validation_service.DatabaseValidationService._test_tcp", return_value=True)
+def test_source_validation_returns_structured_failure_when_preview_errors(mock_tcp, mock_get_validator):
+    """Preview-stage exceptions should return a failed validation response, not a 500."""
+    app = create_app("testing")
+    client = app.test_client()
+
+    mock_validator = MagicMock()
+    mock_validator.validate_connection.return_value = True
+    mock_validator.database_exists.return_value = True
+    mock_validator.validate_permissions.return_value = {"SELECT": True, "INSERT": True, "CREATE": True}
+    mock_validator.discover_tables.return_value = ["employees"]
+    mock_validator.get_table_row_count.return_value = 100
+    mock_validator.fetch_sample_rows.side_effect = Exception("Access denied for table 'employees'")
+    mock_get_validator.return_value = mock_validator
+
+    response = client.post(
+        "/database-configs/validate",
+        json={
+            "database_type": "MYSQL",
+            "host": "mysql.example.com",
+            "port": 3306,
+            "username": "root",
+            "password": "secret",
+            "database_name": "company",
+            "purpose": "SOURCE",
+        },
+        headers=_auth_headers(),
+    )
+
+    assert response.status_code == 200
+    data = response.get_json()
+    assert data["connection"] == "failed"
+    assert data["selectedTable"] == "employees"
+    assert data["tables"] == ["employees"]
+    assert data["checks"][-1]["step"] == "previewing_table"
+    assert "unable to preview table" in data["checks"][-1]["detail"].lower()
+
+
+@patch("app.services.database_validation_service.get_validator")
+@patch("app.services.database_validation_service.DatabaseValidationService._test_tcp", return_value=True)
 def test_destination_validation(mock_tcp, mock_get_validator):
     """Destination validation returns permission checks."""
     app = create_app("testing")

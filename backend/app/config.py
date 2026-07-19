@@ -1,9 +1,15 @@
 import os
 from dataclasses import dataclass
+from pathlib import Path
 
 from dotenv import load_dotenv
 
-load_dotenv()
+# override=True ensures the project's .env always takes precedence over stray or
+# empty AWS_* variables that may already exist in the OS environment (common on
+# Windows machines with the AWS CLI installed). Without this, an empty
+# AWS_ACCESS_KEY_ID in the shell would shadow the real credentials in .env and the
+# app would incorrectly report "AWS credentials are not configured".
+load_dotenv(Path(__file__).resolve().parents[1] / ".env", override=True)
 
 
 def _get_bool(name: str, default: bool = False) -> bool:

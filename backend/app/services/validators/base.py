@@ -32,7 +32,7 @@ class BaseDatabaseValidator(ABC):
         username: str,
         password: str,
         database_name: str | None = None,
-        timeout: int = 5,
+        timeout: int = 15,
     ) -> None:
         self.host = host
         self.port = port

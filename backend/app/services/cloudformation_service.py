@@ -13,6 +13,10 @@ from typing import Any
 
 from flask import current_app
 
+from app.exceptions.aws_connection import (
+    AWSConnectionNotFoundError,
+    AWSConnectionValidationError,
+)
 from app.models.aws_connection import AWSConnection
 
 
@@ -75,13 +79,18 @@ _MIGRATION_POLICY_STATEMENTS: list[dict[str, Any]] = [
         ],
         "Resource": "*",
     },
-    # ── Secrets Manager: read database credentials ──────────────────────────
+    # ── Secrets Manager: read and write database credentials ──────────────
     {
-        "Sid": "SecretsManagerReadOnly",
+        "Sid": "SecretsManagerFullAccess",
         "Effect": "Allow",
         "Action": [
             "secretsmanager:GetSecretValue",
             "secretsmanager:DescribeSecret",
+            "secretsmanager:CreateSecret",
+            "secretsmanager:UpdateSecret",
+            "secretsmanager:DeleteSecret",
+            "secretsmanager:PutSecretValue",
+            "secretsmanager:TagResource",
         ],
         "Resource": "*",
     },
@@ -226,22 +235,24 @@ class CloudFormationService:
     ) -> dict[str, Any]:
         connection = AWSConnection.query.get(aws_connection_id)
         if connection is None:
-            raise ValueError(f"AWS connection {aws_connection_id} was not found.")
+            raise AWSConnectionNotFoundError(
+                f"AWS connection {aws_connection_id} was not found."
+            )
 
         control_plane_account_id = current_app.config.get(
             "CLOUDBRIDGE_AWS_ACCOUNT_ID", ""
         ).strip()
         if not control_plane_account_id:
-            raise ValueError(
+            raise AWSConnectionValidationError(
                 "CLOUDBRIDGE_AWS_ACCOUNT_ID must be configured before "
-                "generating an onboarding template."
+                "generating an onboarding template. Set it in the backend .env file."
             )
 
         # ── Build the template ──────────────────────────────────────────────
         template: dict[str, Any] = {
             "AWSTemplateFormatVersion": "2010-09-09",
             "Description": (
-                "CloudBridge production IAM stack — creates the cross-account "
+                "CloudBridge production IAM stack - creates the cross-account "
                 "migration role, ECS execution role, and ECS task role. "
                 "Deploy this stack in the customer AWS account."
             ),
@@ -328,7 +339,7 @@ class CloudFormationService:
                     "Properties": {
                         "RoleName": "CloudBridgeExecutionRole",
                         "Description": (
-                            "ECS Fargate execution role — allows the ECS "
+                            "ECS Fargate execution role - allows the ECS "
                             "agent to pull images from ECR and write logs "
                             "to CloudWatch Logs."
                         ),
@@ -409,7 +420,7 @@ class CloudFormationService:
                 "Properties": {
                     "RoleName": "CloudBridgeTaskRole",
                     "Description": (
-                        "ECS Fargate task role — granted to the running "
+                        "ECS Fargate task role - granted to the running "
                         "container so it can read secrets and parameters "
                         "at runtime."
                     ),

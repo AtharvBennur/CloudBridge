@@ -89,11 +89,23 @@ class DatabaseValidationService:
         try:
             validator.connect()
         except Exception as exc:
+            error_str = str(exc)
+            # Distinguish between "never connected" vs "connected but query failed"
+            if "during query" in error_str or "timed out" in error_str:
+                detail = (
+                    f"The database server at {host}:{port} accepted the TCP connection, "
+                    f"but the MySQL protocol handshake timed out. This usually means: "
+                    f"(1) the RDS instance is not publicly accessible, "
+                    f"(2) a firewall/security group is filtering the MySQL protocol, or "
+                    f"(3) the database is in a private subnet without a public endpoint."
+                )
+            else:
+                detail = f"Connection failed: {exc}"
             checks.append(ValidationCheck(
                 step="authenticating",
                 label="Authentication Passed",
                 passed=False,
-                detail=f"Connection failed: {exc}",
+                detail=detail,
             ))
             return SourceValidationResponse(
                 connection="failed",
@@ -124,7 +136,21 @@ class DatabaseValidationService:
                 )
 
             # Step 3: Database exists
-            db_exists = validator.database_exists()
+            try:
+                db_exists = validator.database_exists()
+            except Exception as exc:
+                checks.append(ValidationCheck(
+                    step="database_exists",
+                    label="Database Found",
+                    passed=False,
+                    detail=f"Unable to verify database '{database_name}': {exc}",
+                ))
+                return SourceValidationResponse(
+                    connection="failed",
+                    database=database_name or "",
+                    checks=checks,
+                )
+
             checks.append(ValidationCheck(
                 step="database_exists",
                 label="Database Found",
@@ -139,7 +165,21 @@ class DatabaseValidationService:
                 )
 
             # Step 4: Check SELECT permission
-            perms = validator.validate_permissions()
+            try:
+                perms = validator.validate_permissions()
+            except Exception as exc:
+                checks.append(ValidationCheck(
+                    step="checking_permissions",
+                    label="Read Permission Verified",
+                    passed=False,
+                    detail=f"Unable to verify permissions: {exc}",
+                ))
+                return SourceValidationResponse(
+                    connection="failed",
+                    database=database_name or "",
+                    checks=checks,
+                )
+
             has_select = perms.get("SELECT", False)
             checks.append(ValidationCheck(
                 step="checking_permissions",
@@ -147,9 +187,35 @@ class DatabaseValidationService:
                 passed=has_select,
                 detail=None if has_select else "User lacks SELECT privilege",
             ))
+            if not has_select:
+                return SourceValidationResponse(
+                    connection="failed",
+                    database=database_name or "",
+                    checks=checks,
+                )
 
             # Step 5: Discover tables
-            tables = validator.discover_tables()
+            try:
+                tables = validator.discover_tables()
+            except Exception as exc:
+                checks.append(ValidationCheck(
+                    step="discovering_tables",
+                    label="Table Discovery",
+                    passed=False,
+                    detail=f"Unable to discover tables: {exc}",
+                ))
+                return SourceValidationResponse(
+                    connection="failed",
+                    database=database_name or "",
+                    checks=checks,
+                )
+
+            checks.append(ValidationCheck(
+                step="discovering_tables",
+                label="Table Discovery",
+                passed=True,
+                detail=f"Found {len(tables)} table(s)",
+            ))
 
             # Step 6: Pick first table and fetch metadata
             selected_table = tables[0] if tables else None
@@ -159,11 +225,26 @@ class DatabaseValidationService:
             masked_columns: list[str] = []
 
             if selected_table:
-                # Step 7: Row count
-                row_count = validator.get_table_row_count(selected_table)
+                try:
+                    # Step 7: Row count
+                    row_count = validator.get_table_row_count(selected_table)
 
-                # Step 8: Fetch sample rows (raw from validator)
-                columns, raw_rows = validator.fetch_sample_rows(selected_table, limit=5)
+                    # Step 8: Fetch sample rows (raw from validator)
+                    columns, raw_rows = validator.fetch_sample_rows(selected_table, limit=5)
+                except Exception as exc:
+                    checks.append(ValidationCheck(
+                        step="previewing_table",
+                        label="Table Preview",
+                        passed=False,
+                        detail=f"Connected successfully, but unable to preview table '{selected_table}': {exc}",
+                    ))
+                    return SourceValidationResponse(
+                        connection="failed",
+                        database=database_name or "",
+                        selected_table=selected_table,
+                        tables=tables,
+                        checks=checks,
+                    )
 
                 # Step 9: Apply sensitive data masking
                 sample_rows = []
@@ -174,6 +255,12 @@ class DatabaseValidationService:
                     masked_columns_set.update(masked_cols)
 
                 masked_columns = sorted(masked_columns_set)
+                checks.append(ValidationCheck(
+                    step="previewing_table",
+                    label="Table Preview",
+                    passed=True,
+                    detail=f"Previewed table '{selected_table}'",
+                ))
 
             return SourceValidationResponse(
                 connection="success",
@@ -224,11 +311,23 @@ class DatabaseValidationService:
         try:
             validator.connect()
         except Exception as exc:
+            error_str = str(exc)
+            # Distinguish between "never connected" vs "connected but query failed"
+            if "during query" in error_str or "timed out" in error_str:
+                detail = (
+                    f"The database server at {host}:{port} accepted the TCP connection, "
+                    f"but the MySQL protocol handshake timed out. This usually means: "
+                    f"(1) the RDS instance is not publicly accessible, "
+                    f"(2) a firewall/security group is filtering the MySQL protocol, or "
+                    f"(3) the database is in a private subnet without a public endpoint."
+                )
+            else:
+                detail = f"Connection failed: {exc}"
             checks.append(ValidationCheck(
                 step="authenticating",
                 label="Authentication Passed",
                 passed=False,
-                detail=f"Connection failed: {exc}",
+                detail=detail,
             ))
             return DestinationValidationResponse(
                 connection="failed",
@@ -263,16 +362,56 @@ class DatabaseValidationService:
                 )
 
             # Step 3: Database exists
-            db_exists = validator.database_exists()
+            try:
+                db_exists = validator.database_exists()
+            except Exception as exc:
+                checks.append(ValidationCheck(
+                    step="database_exists",
+                    label="Database Exists",
+                    passed=False,
+                    detail=f"Unable to verify database '{database_name}': {exc}",
+                ))
+                return DestinationValidationResponse(
+                    connection="failed",
+                    database_exists=False,
+                    write_permission=False,
+                    read_permission=False,
+                    checks=checks,
+                )
+
             checks.append(ValidationCheck(
                 step="database_exists",
                 label="Database Exists",
                 passed=db_exists,
                 detail=None if db_exists else f"Database '{database_name}' not found",
             ))
+            if not db_exists:
+                return DestinationValidationResponse(
+                    connection="failed",
+                    database_exists=False,
+                    write_permission=False,
+                    read_permission=False,
+                    checks=checks,
+                )
 
             # Step 4: Check permissions
-            perms = validator.validate_permissions()
+            try:
+                perms = validator.validate_permissions()
+            except Exception as exc:
+                checks.append(ValidationCheck(
+                    step="checking_permissions",
+                    label="Permissions Verified",
+                    passed=False,
+                    detail=f"Unable to verify permissions: {exc}",
+                ))
+                return DestinationValidationResponse(
+                    connection="failed",
+                    database_exists=True,
+                    write_permission=False,
+                    read_permission=False,
+                    checks=checks,
+                )
+
             has_select = perms.get("SELECT", False)
             has_insert = perms.get("INSERT", False)
             has_create = perms.get("CREATE", False)

@@ -309,8 +309,11 @@ export function DatabaseConfigPage() {
                       id="host"
                       value={formValues.host}
                       onChange={(e) => setFormValues({ ...formValues, host: sanitizeHost(e.target.value) })}
-                      placeholder="3.82.69.232 or db.example.com"
+                      placeholder="mydb.cm1406ikomix.us-east-1.rds.amazonaws.com"
                     />
+                    <p className="text-xs text-muted-foreground">
+                      Use the RDS DNS endpoint, not an IP address. Find it in the AWS Console under RDS → Connectivity.
+                    </p>
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="port">Port</Label>

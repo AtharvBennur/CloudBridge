@@ -125,7 +125,7 @@ export function ObservabilityPage() {
           </CardHeader>
           <CardContent>
             <div className="text-3xl font-semibold">
-              {metrics?.total_migrations || 0}
+              {metrics?.migrations.total || 0}
             </div>
             <p className="text-xs text-muted-foreground mt-1">All time</p>
           </CardContent>
@@ -137,7 +137,7 @@ export function ObservabilityPage() {
           </CardHeader>
           <CardContent>
             <div className="text-3xl font-semibold text-emerald-600">
-              {metrics?.running_migrations || 0}
+              {metrics?.migrations.running || 0}
             </div>
             <p className="text-xs text-muted-foreground mt-1">
               Active migrations
@@ -151,7 +151,7 @@ export function ObservabilityPage() {
           </CardHeader>
           <CardContent>
             <div className="text-3xl font-semibold text-red-600">
-              {metrics?.failed_migrations || 0}
+              {metrics?.migrations.failed || 0}
             </div>
             <p className="text-xs text-muted-foreground mt-1">
               Requires attention
@@ -165,9 +165,7 @@ export function ObservabilityPage() {
           </CardHeader>
           <CardContent>
             <div className="text-3xl font-semibold">
-              {metrics?.avg_migration_duration_seconds
-                ? `${Math.round(metrics.avg_migration_duration_seconds / 60)}m`
-                : "0m"}
+              {"0m"}
             </div>
             <p className="text-xs text-muted-foreground mt-1">Per migration</p>
           </CardContent>
@@ -198,25 +196,25 @@ export function ObservabilityPage() {
                 <div className="p-4 rounded-xl border border-border/50">
                   <p className="text-xs text-muted-foreground">AWS Connections</p>
                   <p className="text-2xl font-semibold mt-1">
-                    {healthMetrics.total_aws_connections}
+                    {healthMetrics.aws_connections.total}
                   </p>
                 </div>
                 <div className="p-4 rounded-xl border border-border/50">
                   <p className="text-xs text-muted-foreground">Database Configs</p>
                   <p className="text-2xl font-semibold mt-1">
-                    {healthMetrics.total_database_configs}
+                    {healthMetrics.database_configs.total}
                   </p>
                 </div>
                 <div className="p-4 rounded-xl border border-border/50">
                   <p className="text-xs text-muted-foreground">Active ECS Tasks</p>
                   <p className="text-2xl font-semibold mt-1">
-                    {healthMetrics.active_ecs_tasks}
+                    {0}
                   </p>
                 </div>
                 <div className="p-4 rounded-xl border border-border/50">
                   <p className="text-xs text-muted-foreground">Audit Log Entries</p>
                   <p className="text-2xl font-semibold mt-1">
-                    {healthMetrics.total_audit_logs}
+                    {0}
                   </p>
                 </div>
               </div>
