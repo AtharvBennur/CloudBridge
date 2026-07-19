@@ -15,7 +15,12 @@ Migration Model
 
 from flask import Blueprint, jsonify, request
 
-from app.exceptions.migration import MigrationError, MigrationNotFoundError, MigrationValidationError
+from app.exceptions.migration import (
+    MigrationError,
+    MigrationIntegrityError,
+    MigrationNotFoundError,
+    MigrationValidationError,
+)
 from app.middleware.auth import login_required
 from app.services.migration_service import MigrationService
 
@@ -28,6 +33,12 @@ migration_service = MigrationService()
 def handle_validation_error(error: MigrationValidationError):
     """Return a validation error response for invalid migration payloads."""
     return jsonify({"error": {"message": error.message}}), 400
+
+
+@migration_bp.errorhandler(MigrationIntegrityError)
+def handle_integrity_error(error: MigrationIntegrityError):
+    """Return a 422 response when referenced resources do not exist."""
+    return jsonify({"error": {"message": error.message}}), 422
 
 
 @migration_bp.errorhandler(MigrationNotFoundError)

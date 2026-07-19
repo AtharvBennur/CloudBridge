@@ -28,3 +28,7 @@ class MigrationValidationError(MigrationError):
 
 class MigrationNotFoundError(MigrationError):
     """Raised when a migration job cannot be located by ID."""
+
+
+class MigrationIntegrityError(MigrationError):
+    """Raised when a referenced foreign key does not exist."""

@@ -20,8 +20,16 @@ from typing import Any
 
 from flask import current_app
 
-from app.exceptions.migration import MigrationNotFoundError, MigrationValidationError
+from sqlalchemy.exc import IntegrityError, SQLAlchemyError
+
+from app.exceptions.migration import (
+    MigrationIntegrityError,
+    MigrationNotFoundError,
+    MigrationValidationError,
+)
 from app.extensions import db
+from app.models.aws_connection import AWSConnection
+from app.models.database_config import DatabaseConfig
 from app.models.migration import MigrationJob, MigrationStatus
 from app.schemas.migration import (
     CreateMigrationRequest,
@@ -41,6 +49,17 @@ class MigrationService:
         """Validate and persist a new migration job."""
         try:
             create_request = CreateMigrationRequest.from_payload(payload)
+        except ValueError as exc:
+            raise MigrationValidationError(str(exc)) from exc
+
+        # Validate foreign key references before persisting
+        self._validate_foreign_keys(
+            aws_connection_id=create_request.aws_connection_id,
+            source_database_config_id=create_request.source_database_config_id,
+            destination_database_config_id=create_request.destination_database_config_id,
+        )
+
+        try:
             migration_job = MigrationJob(
                 job_name=create_request.job_name,
                 source_database=create_request.source_database,
@@ -53,9 +72,16 @@ class MigrationService:
             )
             db.session.add(migration_job)
             db.session.commit()
-        except ValueError as exc:
+        except IntegrityError as exc:
             db.session.rollback()
-            raise MigrationValidationError(str(exc)) from exc
+            raise MigrationIntegrityError(
+                f"Referenced resource does not exist: {exc.orig}"
+            ) from exc
+        except SQLAlchemyError as exc:
+            db.session.rollback()
+            raise MigrationIntegrityError(
+                f"Database error while creating migration: {exc.orig}"
+            ) from exc
 
         self._log_info("Migration created", migration_job.id, migration_job.job_name)
         return MigrationResponse.from_model(migration_job)
@@ -78,6 +104,17 @@ class MigrationService:
 
         try:
             update_request = UpdateMigrationRequest.from_payload(payload)
+        except ValueError as exc:
+            raise MigrationValidationError(str(exc)) from exc
+
+        # Validate foreign key references if they are being changed
+        self._validate_foreign_keys(
+            aws_connection_id=update_request.aws_connection_id,
+            source_database_config_id=update_request.source_database_config_id,
+            destination_database_config_id=update_request.destination_database_config_id,
+        )
+
+        try:
             if update_request.job_name is not None:
                 migration_job.job_name = update_request.job_name
             if update_request.source_database is not None:
@@ -97,9 +134,16 @@ class MigrationService:
 
             migration_job.updated_at = datetime.utcnow()
             db.session.commit()
-        except ValueError as exc:
+        except IntegrityError as exc:
             db.session.rollback()
-            raise MigrationValidationError(str(exc)) from exc
+            raise MigrationIntegrityError(
+                f"Referenced resource does not exist: {exc.orig}"
+            ) from exc
+        except SQLAlchemyError as exc:
+            db.session.rollback()
+            raise MigrationIntegrityError(
+                f"Database error while updating migration: {exc.orig}"
+            ) from exc
 
         self._log_info("Migration updated", migration_job.id, migration_job.job_name)
         return MigrationResponse.from_model(migration_job)
@@ -118,6 +162,29 @@ class MigrationService:
         if migration_job is None:
             raise MigrationNotFoundError(f"Migration job {migration_id} was not found.")
         return migration_job
+
+    @staticmethod
+    def _validate_foreign_keys(
+        aws_connection_id: int | None = None,
+        source_database_config_id: int | None = None,
+        destination_database_config_id: int | None = None,
+    ) -> None:
+        """Verify that referenced foreign keys exist before persisting."""
+        if aws_connection_id is not None:
+            if not AWSConnection.query.get(aws_connection_id):
+                raise MigrationIntegrityError(
+                    f"AWS connection with id {aws_connection_id} does not exist."
+                )
+        if source_database_config_id is not None:
+            if not DatabaseConfig.query.get(source_database_config_id):
+                raise MigrationIntegrityError(
+                    f"Source database config with id {source_database_config_id} does not exist."
+                )
+        if destination_database_config_id is not None:
+            if not DatabaseConfig.query.get(destination_database_config_id):
+                raise MigrationIntegrityError(
+                    f"Destination database config with id {destination_database_config_id} does not exist."
+                )
 
     def _log_info(self, message: str, migration_id: int | None = None, job_name: str | None = None) -> None:
         """Write a structured log entry through Flask's configured logger."""

@@ -31,6 +31,7 @@ class DatabaseConfig(db.Model):
     host = db.Column(db.String(255), nullable=False)
     port = db.Column(db.Integer, nullable=False)
     username = db.Column(db.String(255), nullable=False)
+    database_name = db.Column(db.String(255), nullable=True)  # Actual DB name on the server
     secret_arn = db.Column(db.String(512), nullable=True)
     secret_name = db.Column(db.String(255), nullable=True)
     provisioning_config = db.Column(db.Text, nullable=True)

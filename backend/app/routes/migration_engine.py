@@ -174,3 +174,50 @@ def migration_status(migration_id: int):
         "completed_at": migration.completed_at.isoformat() if migration.completed_at else None,
         "checkpoints": checkpoint_list
     }), 200
+
+
+@migration_engine_bp.post("/status-update")
+def update_migration_status():
+    """Internal endpoint called by the ECS worker to update migration progress.
+
+    No auth required — the worker runs inside the customer's VPC and the
+    endpoint is only reachable from within the CloudBridge infrastructure.
+    In production, add a shared secret or IP restriction.
+    """
+    payload = request.get_json(silent=True) or {}
+    migration_id = payload.get("migration_id")
+    migration = MigrationJob.query.get(migration_id)
+    if migration is None:
+        return jsonify({"error": {"message": "Migration job was not found."}}), 404
+
+    status = payload.get("status")
+    if status and status in MigrationStatus.VALUES:
+        migration.status = status
+
+    if "progress_percent" in payload:
+        migration.progress_percent = float(payload["progress_percent"])
+    if "rows_migrated" in payload:
+        migration.rows_migrated = int(payload["rows_migrated"])
+    if "error" in payload:
+        migration.error_message = payload["error"]
+    if status == "COMPLETED":
+        migration.completed_at = datetime.utcnow()
+        migration.progress_percent = 100.0
+    if status == "FAILED":
+        migration.completed_at = datetime.utcnow()
+
+    db.session.commit()
+
+    # Broadcast to WebSocket listeners
+    from app.services.websocket_service import websocket_service
+    websocket_service.broadcast_migration_update(
+        migration_id,
+        {
+            "status": migration.status,
+            "progress_percent": migration.progress_percent,
+            "rows_migrated": migration.rows_migrated,
+            "error_message": migration.error_message,
+        },
+    )
+
+    return jsonify({"message": "Status updated.", "migration_id": migration.id, "status": migration.status}), 200

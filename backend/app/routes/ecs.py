@@ -8,20 +8,26 @@ Blueprints keep the API surface organized and allow the service layer to remain 
 Architecture:
 ECS Blueprint
 ↓
-ECS Service
+MigrationExecutionService (orchestrator)
 ↓
-ECS Task Model
+ECRManager → ECSManager → TaskDefinitionService → LogStreamingService
 """
 
-from flask import Blueprint, jsonify, request
+import threading
 
-from app.exceptions.ecs import ECSTaskNotFoundError, ECSValidationError, ECSServiceError
+from flask import Blueprint, current_app, jsonify, request
+
+from app.exceptions.ecs import ECSTaskNotFoundError, ECSValidationError, ECSServiceError, ECSResourceError, ECSPermissionError
 from app.middleware.auth import login_required
 from app.schemas.ecs import CreateECSTaskRequest, ECSTaskResponse
 from app.services.ecs_service import ECSService
+from app.services.migration_execution_service import MigrationExecutionService
+from app.services.migration_status_poller import MigrationStatusPoller
 
 ecs_bp = Blueprint("ecs", __name__, url_prefix="/ecs")
 ecs_service = ECSService()
+migration_execution_service = MigrationExecutionService()
+migration_status_poller = MigrationStatusPoller()
 
 
 @ecs_bp.errorhandler(ECSValidationError)
@@ -40,6 +46,18 @@ def handle_not_found_error(error: ECSTaskNotFoundError):
 def handle_ecs_error(error: ECSServiceError):
     """Return a generic response for ECS service failures."""
     return jsonify({"error": {"message": error.message}}), 400
+
+
+@ecs_bp.errorhandler(ECSResourceError)
+def handle_resource_error(error: ECSResourceError):
+    """Return a response for ECS resource discovery failures."""
+    return jsonify({"error": {"message": error.message}}), 424
+
+
+@ecs_bp.errorhandler(ECSPermissionError)
+def handle_permission_error(error: ECSPermissionError):
+    """Return a response for IAM permission failures."""
+    return jsonify({"error": {"message": error.message}}), 403
 
 
 @ecs_bp.post("/tasks")
@@ -163,3 +181,80 @@ def get_ecs_task(task_id: int):
         return jsonify({"error": {"message": "ECS task not found"}}), 404
     
     return jsonify(ECSTaskResponse.from_model(task).to_dict()), 200
+
+
+@ecs_bp.post("/tasks/start-all")
+@login_required
+def start_all_ecs_tasks():
+    """Start all PENDING ECS tasks for a migration."""
+    payload = request.get_json(silent=True) or {}
+    migration_id = payload.get("migration_id")
+
+    if not migration_id:
+        return jsonify({"error": {"message": "migration_id is required"}}), 400
+
+    try:
+        started = ecs_service.start_all_pending(int(migration_id))
+        return jsonify({
+            "started_count": len(started),
+            "tasks": [ECSTaskResponse.from_model(t).to_dict() for t in started],
+        }), 200
+    except ECSServiceError as exc:
+        return jsonify({"error": {"message": str(exc)}}), 400
+
+
+@ecs_bp.post("/start-migration")
+@login_required
+def start_migration():
+    """Start a migration on ECS/Fargate with full automation.
+
+    Phase 1 (synchronous): Validate inputs, reset state, create task record.
+    Phase 2 (background thread): AWS resource discovery, Docker build/push,
+    task definition registration, ECS RunTask, log streaming, status polling.
+
+    Returns 202 Accepted immediately so the frontend is not blocked waiting
+    for Docker builds and AWS API calls.
+    """
+    payload = request.get_json(silent=True) or {}
+    migration_id = payload.get("migration_id")
+    aws_connection_id = payload.get("aws_connection_id")
+
+    if not migration_id:
+        return jsonify({"error": {"message": "migration_id is required"}}), 400
+
+    try:
+        # Phase 1: fast validation + task-record creation
+        task = migration_execution_service.prepare_migration(
+            int(migration_id),
+            aws_connection_id=int(aws_connection_id) if aws_connection_id else None,
+        )
+
+        # Phase 2: heavy AWS work in a background thread
+        app = current_app._get_current_object()  # noqa: SLF001
+        thread = threading.Thread(
+            target=migration_execution_service.execute_migration_background,
+            args=(app, task.id, int(migration_id), task.aws_connection_id),
+            daemon=True,
+        )
+        thread.start()
+
+        # Start background polling for task status (poller waits for RUNNING)
+        migration_status_poller.start_polling(task.id)
+
+        return jsonify({
+            "message": "Migration started. Building worker image and launching ECS task…",
+            "task": ECSTaskResponse.from_model(task).to_dict(),
+        }), 202
+
+    except ECSTaskNotFoundError as exc:
+        return jsonify({"error": {"message": exc.message}}), 404
+    except ECSPermissionError as exc:
+        return jsonify({"error": {"message": exc.message}}), 403
+    except ECSResourceError as exc:
+        return jsonify({"error": {"message": exc.message}}), 424
+    except (ECSValidationError, ECSServiceError) as exc:
+        return jsonify({"error": {"message": exc.message}}), 400
+    except Exception as exc:
+        import logging
+        logging.getLogger(__name__).exception("Unexpected error in start_migration")
+        return jsonify({"error": {"message": f"Internal error: {str(exc)}"}}), 500

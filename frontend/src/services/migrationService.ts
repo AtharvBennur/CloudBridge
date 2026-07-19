@@ -24,6 +24,14 @@ export interface MigrationJob {
   destination_database: string;
   status: string;
   description: string | null;
+  aws_connection_id: number | null;
+  source_database_config_id: number | null;
+  destination_database_config_id: number | null;
+  progress_percent: number;
+  rows_migrated: number;
+  total_rows: number | null;
+  current_table: string | null;
+  error_message: string | null;
   created_at: string;
   updated_at: string;
 }

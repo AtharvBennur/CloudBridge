@@ -24,6 +24,7 @@ export interface AWSConnection {
   role_arn: string;
   external_id: string;
   connection_status: string;
+  last_validated_at: string;
   created_at: string;
   updated_at: string;
 }
@@ -31,7 +32,7 @@ export interface AWSConnection {
 export interface CreateAWSConnectionPayload {
   aws_account_id: string;
   aws_region: string;
-  role_arn: string;
+  role_arn?: string;
 }
 
 export interface UpdateAWSConnectionPayload {
@@ -43,6 +44,31 @@ export interface UpdateAWSConnectionPayload {
 
 export interface DeleteAWSConnectionResponse {
   message: string;
+}
+
+export interface STSConnectResult {
+  status: string;
+  message: string;
+  step: string;
+  aws_connection_id: number;
+  session_assumed: boolean;
+  details: {
+    session_assumed: boolean;
+    assume_role: boolean;
+    account_verified: boolean;
+    region_accessible: boolean;
+    permissions: Record<string, boolean>;
+    caller_identity: { arn: string; account: string };
+    credentials_expires_at: string;
+  };
+}
+
+export interface ValidateResult {
+  status: string;
+  message: string;
+  step: string;
+  aws_connection_id: number;
+  permissions: Record<string, boolean>;
 }
 
 export const awsConnectionService = {
@@ -71,18 +97,25 @@ export const awsConnectionService = {
     return response.data;
   },
 
-  async connect(id: number): Promise<any> {
-    const response = await apiClient.post<any>(`/aws-connections/${id}/connect`);
+  async connect(id: number): Promise<STSConnectResult> {
+    const response = await apiClient.post<STSConnectResult>(`/aws-connections/${id}/connect`);
     return response.data;
   },
 
-  async validate(id: number): Promise<any> {
-    const response = await apiClient.post<any>(`/aws-connections/${id}/validate`);
+  async validate(id: number): Promise<ValidateResult> {
+    const response = await apiClient.post<ValidateResult>(`/aws-connections/${id}/validate`);
     return response.data;
   },
 
   async disconnect(id: number): Promise<any> {
     const response = await apiClient.post<any>(`/aws-connections/${id}/disconnect`);
+    return response.data;
+  },
+
+  async registerRoleArn(id: number, roleArn: string): Promise<AWSConnection> {
+    const response = await apiClient.post<AWSConnection>(`/aws-connections/${id}/register-role-arn`, {
+      role_arn: roleArn,
+    });
     return response.data;
   },
 

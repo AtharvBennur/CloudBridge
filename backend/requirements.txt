@@ -8,6 +8,9 @@ gunicorn==23.0.0
 python-dotenv==1.0.1
 SQLAlchemy==2.0.36
 psycopg2-binary==2.9.10
+pymysql==1.1.1
+pyodbc==5.1.0
+oracledb==4.0.2
 PyJWT==2.10.1
 requests==2.32.3
 pytest==8.3.4

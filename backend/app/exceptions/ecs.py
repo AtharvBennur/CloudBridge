@@ -15,3 +15,11 @@ class ECSTaskNotFoundError(ECSServiceError):
 
 class ECSValidationError(ECSServiceError):
     """Raised when ECS configuration is invalid."""
+
+
+class ECSResourceError(ECSServiceError):
+    """Raised when ECS resource discovery or provisioning fails."""
+
+
+class ECSPermissionError(ECSServiceError):
+    """Raised when AWS IAM permissions are insufficient."""

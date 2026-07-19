@@ -10,68 +10,90 @@ logic directly in the service layer.
 
 from __future__ import annotations
 
+import logging
 import os
+import time
 from typing import Any
 
 import boto3
 from botocore.exceptions import BotoCoreError, ClientError, NoCredentialsError
+
+logger = logging.getLogger(__name__)
 
 
 class AWSClient:
     """Thin wrapper around boto3 that supports cross-account STS assumptions."""
 
     def __init__(self, logger: Any | None = None) -> None:
-        self._logger = logger
+        self._logger = logger or logging.getLogger(__name__)
+
+    @staticmethod
+    def has_real_aws_credentials() -> bool:
+        """Return True if real AWS credentials are available in the environment."""
+        access_key = os.getenv("AWS_ACCESS_KEY_ID", "").strip()
+        secret_key = os.getenv("AWS_SECRET_ACCESS_KEY", "").strip()
+        return bool(access_key and secret_key)
 
     def assume_role(self, role_arn: str, external_id: str, region: str | None = None) -> dict[str, Any]:
-        """Assume a customer role using a supplied external ID."""
+        """Assume a customer role using a supplied external ID.
+
+        Raises ValueError when no real AWS credentials are configured or when
+        the AssumeRole call fails.
+        """
         if not isinstance(role_arn, str) or not role_arn.strip():
             raise ValueError("Role ARN is required.")
         if not isinstance(external_id, str) or not external_id.strip():
             raise ValueError("External ID is required.")
 
-        credentials = self._get_fallback_credentials(role_arn, external_id, region)
-        if credentials is None:
-            try:
-                client = self._get_client("sts", region=region)
-                response = client.assume_role(
-                    RoleArn=role_arn,
-                    RoleSessionName="CloudBridgeSession",
-                    ExternalId=external_id,
-                )
-                credentials = response.get("Credentials", {})
-            except (ClientError, BotoCoreError, NoCredentialsError) as exc:
-                self._log("AssumeRole failure for %s: %s", role_arn, exc)
-                raise ValueError(f"Unable to assume customer role: {exc}") from exc
+        if not self.has_real_aws_credentials():
+            self._log("AssumeRole rejected for %s: no real AWS credentials configured", role_arn)
+            raise ValueError(
+                "AWS credentials are not configured on the CloudBridge server. "
+                "Set AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY environment variables "
+                "to enable cross-account STS AssumeRole."
+            )
 
-        if not credentials:
-            raise ValueError("Unable to assume role with the provided AWS configuration.")
+        start = time.monotonic()
+        try:
+            client = self._get_client("sts", region=region)
+            response = client.assume_role(
+                RoleArn=role_arn,
+                RoleSessionName="CloudBridgeSession",
+                ExternalId=external_id,
+            )
+            credentials = response.get("Credentials", {})
+        except (ClientError, BotoCoreError, NoCredentialsError) as exc:
+            duration_ms = (time.monotonic() - start) * 1000
+            self._log("AssumeRole failed for %s after %.0fms: %s", role_arn, duration_ms, exc)
+            raise ValueError(f"Unable to assume customer role: {exc}") from exc
 
-        result = {
+        if not credentials or not credentials.get("AccessKeyId"):
+            raise ValueError("AssumeRole returned empty credentials — the role may not exist or trust policy is incorrect.")
+
+        duration_ms = (time.monotonic() - start) * 1000
+        self._log(
+            "AssumeRole success for %s (region=%s, duration=%.0fms); credentials expire at %s",
+            role_arn, region or self._default_region(), duration_ms, credentials.get("Expiration"),
+        )
+
+        return {
             "AccessKeyId": credentials.get("AccessKeyId"),
             "SecretAccessKey": credentials.get("SecretAccessKey"),
             "SessionToken": credentials.get("SessionToken"),
             "Expiration": credentials.get("Expiration"),
             "AssumedRoleUser": {"Arn": role_arn, "AssumedRoleId": "CloudBridgeRole"},
         }
-        self._log("AssumeRole success for %s; temporary credentials expire at %s", role_arn, result["Expiration"])
-        return result
 
     def verify_account_id(self, credentials: dict[str, Any], expected_account_id: str, region: str | None = None) -> dict[str, Any]:
         """Verify that assumed credentials map to the expected AWS account."""
         if not isinstance(expected_account_id, str) or not expected_account_id.strip():
             raise ValueError("Expected AWS account ID is required.")
 
-        if self._is_simulated(credentials):
-            account_id = credentials.get("AccountId", expected_account_id)
-        elif credentials.get("AccountId"):
-            account_id = credentials["AccountId"]
-        else:
-            try:
-                identity = self._get_client("sts", region=region, credentials=credentials).get_caller_identity()
-                account_id = identity.get("Account")
-            except (ClientError, BotoCoreError) as exc:
-                raise ValueError(f"Unable to verify assumed AWS identity: {exc}") from exc
+        try:
+            identity = self._get_client("sts", region=region, credentials=credentials).get_caller_identity()
+            account_id = identity.get("Account")
+        except (ClientError, BotoCoreError) as exc:
+            raise ValueError(f"Unable to verify assumed AWS identity: {exc}") from exc
 
         if account_id and account_id != expected_account_id:
             raise ValueError(f"Expected account {expected_account_id}, got {account_id}.")
@@ -83,9 +105,6 @@ class AWSClient:
         if not isinstance(region, str) or not region.strip():
             raise ValueError("AWS region is required.")
 
-        if self._is_simulated(credentials):
-            return {"region": region, "accessible": True, "mode": "simulated"}
-
         try:
             client = self._get_client("ec2", region=region, credentials=credentials)
             client.describe_regions(DryRun=False)
@@ -94,26 +113,110 @@ class AWSClient:
 
         return {"region": region, "accessible": True, "mode": "live"}
 
-    def validate_iam_permissions(self, credentials: dict[str, Any], region: str | None = None) -> dict[str, bool]:
-        """Return a basic permission readiness map for the assumed role."""
-        base_permissions = {
-            "sts:AssumeRole": True,
-            "iam:PassRole": True,
-            "ec2:DescribeRegions": True,
-            "secretsmanager:CreateSecret": True,
-        }
+    def validate_iam_permissions(self, credentials: dict[str, Any], region: str | None = None) -> dict[str, Any]:
+        """Probe every permission and return a structured result.
 
-        if self._is_simulated(credentials):
-            return base_permissions
+        Returns::
+
+            {
+                "permissions": {
+                    "sts:GetCallerIdentity":  {"granted": True,  "required": "always"},
+                    "ec2:DescribeRegions":    {"granted": True,  "required": "always"},
+                    "secretsmanager:DescribeSecret": {"granted": True,  "required": "always"},
+                    "secretsmanager:GetSecretValue": {"granted": False, "required": "conditional"},
+                    "secretsmanager:CreateSecret":   {"granted": False, "required": "conditional"},
+                    "secretsmanager:PutSecretValue": {"granted": False, "required": "conditional"},
+                    "rds:DescribeDBInstances":  {"granted": True,  "required": "conditional"},
+                    "rds:DescribeDBClusters":   {"granted": False, "required": "conditional"},
+                },
+                "required_missing": [],
+            }
+
+        The ``required`` tag is *not* computed here — the caller (PreflightService)
+        decides which permissions are actually required for the current migration.
+        """
+        perms: dict[str, dict[str, Any]] = {}
+
+        # --- STS ---
+        try:
+            sts = self._get_client("sts", region=region, credentials=credentials)
+            sts.get_caller_identity()
+            perms["sts:GetCallerIdentity"] = {"granted": True, "required": "always"}
+        except Exception:
+            perms["sts:GetCallerIdentity"] = {"granted": False, "required": "always"}
+            # If STS identity fails nothing else will either
+            return {"permissions": perms, "required_missing": ["sts:GetCallerIdentity"]}
+
+        # --- EC2 ---
+        try:
+            ec2 = self._get_client("ec2", region=region, credentials=credentials)
+            ec2.describe_regions(DryRun=False)
+            perms["ec2:DescribeRegions"] = {"granted": True, "required": "always"}
+        except Exception:
+            perms["ec2:DescribeRegions"] = {"granted": False, "required": "always"}
+
+        # --- Secrets Manager ---
+        sm = self._get_client("secretsmanager", region=region, credentials=credentials)
+
+        # DescribeSecret (probe with a non-existent secret)
+        try:
+            sm.describe_secret(SecretId="cloudbridge-probe-nonexistent")
+            perms["secretsmanager:DescribeSecret"] = {"granted": True, "required": "always"}
+        except ClientError as exc:
+            code = exc.response.get("Error", {}).get("Code", "")
+            granted = code == "ResourceNotFoundException"
+            perms["secretsmanager:DescribeSecret"] = {"granted": granted, "required": "always"}
+        except Exception:
+            perms["secretsmanager:DescribeSecret"] = {"granted": False, "required": "always"}
+
+        # GetSecretValue (probe — ResourceNotFoundException means we have the permission)
+        try:
+            sm.get_secret_value(SecretId="cloudbridge-probe-nonexistent")
+            perms["secretsmanager:GetSecretValue"] = {"granted": True, "required": "conditional"}
+        except ClientError as exc:
+            code = exc.response.get("Error", {}).get("Code", "")
+            granted = code == "ResourceNotFoundException"
+            perms["secretsmanager:GetSecretValue"] = {"granted": granted, "required": "conditional"}
+        except Exception:
+            perms["secretsmanager:GetSecretValue"] = {"granted": False, "required": "conditional"}
+
+        # ListSecrets — used as a proxy for CreateSecret / PutSecretValue
+        # (same Resource-level "*" in the CloudFormation policy)
+        try:
+            sm.list_secrets(MaxResults=1)
+            perms["secretsmanager:CreateSecret"] = {"granted": True, "required": "conditional"}
+            perms["secretsmanager:PutSecretValue"] = {"granted": True, "required": "conditional"}
+        except ClientError as exc:
+            code = exc.response.get("Error", {}).get("Code", "")
+            granted = code != "AccessDeniedException"
+            perms["secretsmanager:CreateSecret"] = {"granted": granted, "required": "conditional"}
+            perms["secretsmanager:PutSecretValue"] = {"granted": granted, "required": "conditional"}
+        except Exception:
+            perms["secretsmanager:CreateSecret"] = {"granted": False, "required": "conditional"}
+            perms["secretsmanager:PutSecretValue"] = {"granted": False, "required": "conditional"}
+
+        # --- RDS ---
+        rds = self._get_client("rds", region=region, credentials=credentials)
 
         try:
-            client = self._get_client("sts", region=region, credentials=credentials)
-            client.get_caller_identity()
+            rds.describe_db_instances()
+            perms["rds:DescribeDBInstances"] = {"granted": True, "required": "conditional"}
+        except ClientError as exc:
+            code = exc.response.get("Error", {}).get("Code", "")
+            perms["rds:DescribeDBInstances"] = {"granted": code != "AccessDeniedException", "required": "conditional"}
         except Exception:
-            base_permissions["sts:AssumeRole"] = False
-            return base_permissions
+            perms["rds:DescribeDBInstances"] = {"granted": False, "required": "conditional"}
 
-        return base_permissions
+        try:
+            rds.describe_db_clusters()
+            perms["rds:DescribeDBClusters"] = {"granted": True, "required": "conditional"}
+        except ClientError as exc:
+            code = exc.response.get("Error", {}).get("Code", "")
+            perms["rds:DescribeDBClusters"] = {"granted": code != "AccessDeniedException", "required": "conditional"}
+        except Exception:
+            perms["rds:DescribeDBClusters"] = {"granted": False, "required": "conditional"}
+
+        return {"permissions": perms, "required_missing": []}
 
     def test_connection(
         self,
@@ -122,17 +225,41 @@ class AWSClient:
         expected_account_id: str,
         region: str | None = None,
     ) -> dict[str, Any]:
-        """Run the full connection verification workflow."""
+        """Run the full connection verification workflow.
+
+        Returns a dict with ``session_assumed`` indicating whether real temporary
+        credentials were successfully obtained via STS AssumeRole.
+        """
         credentials = self.assume_role(role_arn, external_id, region=region)
         account_result = self.verify_account_id(credentials, expected_account_id, region=region)
         region_result = self.validate_region_access(credentials, region=region)
         permissions = self.validate_iam_permissions(credentials, region=region)
+
+        # Verify with GetCallerIdentity as final proof
+        try:
+            sts_client = self._get_client("sts", region=region, credentials=credentials)
+            identity = sts_client.get_caller_identity()
+            caller_arn = identity.get("Arn", "")
+            caller_account = identity.get("Account", "")
+        except Exception:
+            caller_arn = ""
+            caller_account = ""
+
         return {
+            "session_assumed": True,
             "assume_role": True,
             "account_verified": account_result["verified"],
             "region_accessible": region_result["accessible"],
             "permissions": permissions,
-            "credentials_expires_at": credentials.get("Expiration").isoformat() if hasattr(credentials.get("Expiration"), "isoformat") else credentials.get("Expiration"),
+            "caller_identity": {
+                "arn": caller_arn,
+                "account": caller_account,
+            },
+            "credentials_expires_at": (
+                credentials.get("Expiration").isoformat()
+                if hasattr(credentials.get("Expiration"), "isoformat")
+                else credentials.get("Expiration")
+            ),
         }
 
     def get_boto3_client(self, service_name: str, credentials: dict[str, Any] | None = None, region: str | None = None):
@@ -150,24 +277,6 @@ class AWSClient:
             aws_secret_access_key=credentials.get("SecretAccessKey"),
             aws_session_token=credentials.get("SessionToken"),
         )
-
-    def _get_fallback_credentials(self, role_arn: str, external_id: str, region: str | None = None) -> dict[str, Any] | None:
-        access_key_id = os.getenv("AWS_ACCESS_KEY_ID", "").strip()
-        secret_access_key = os.getenv("AWS_SECRET_ACCESS_KEY", "").strip()
-        if not access_key_id or not secret_access_key:
-            fallback = {
-                "AccessKeyId": "test-access-key",
-                "SecretAccessKey": "test-secret-key",
-                "SessionToken": "test-session-token",
-                "AccountId": os.getenv("CLOUDBRIDGE_AWS_ACCOUNT_ID", "123456789012"),
-            }
-            self._log("Using simulated AWS credentials - no real AWS credentials configured")
-            return fallback
-        return None
-
-    @staticmethod
-    def _is_simulated(credentials: dict[str, Any]) -> bool:
-        return credentials.get("AccessKeyId") == "test-access-key"
 
     def _log(self, message: str, *args: Any) -> None:
         if self._logger is not None:

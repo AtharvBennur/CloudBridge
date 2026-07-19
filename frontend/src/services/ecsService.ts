@@ -12,9 +12,11 @@ export interface ECSTask {
   security_group_ids: string[];
   cpu: string;
   memory: string;
-  status: "PENDING" | "RUNNING" | "STOPPED" | "FAILED";
+  status: "PENDING" | "RUNNING" | "STOPPED" | "FAILED" | "SUCCEEDED";
   exit_code?: number;
   reason?: string;
+  retry_count: number;
+  max_retries: number;
   started_at?: string;
   stopped_at?: string;
   created_at: string;
@@ -87,6 +89,18 @@ export const ecsService = {
 
   async getTask(taskId: number): Promise<ECSTask> {
     const response = await apiClient.get(`/ecs/tasks/${taskId}`);
+    return response.data;
+  },
+
+  async startAllTasks(migrationId: number): Promise<{ started_count: number; tasks: ECSTask[] }> {
+    const response = await apiClient.post("/ecs/tasks/start-all", { migration_id: migrationId });
+    return response.data;
+  },
+
+  async startMigration(migrationId: number, awsConnectionId?: number): Promise<{ message: string; task: ECSTask }> {
+    const body: any = { migration_id: migrationId };
+    if (awsConnectionId) body.aws_connection_id = awsConnectionId;
+    const response = await apiClient.post("/ecs/start-migration", body);
     return response.data;
   },
 };

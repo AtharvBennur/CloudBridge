@@ -2,8 +2,7 @@
 
 from __future__ import annotations
 
-import json
-import os
+import logging
 import socket
 from datetime import datetime
 from typing import Any
@@ -15,7 +14,9 @@ from app.models.aws_connection import AWSConnection
 from app.models.database_config import DatabaseConfig
 from app.schemas.database_config import CreateDatabaseConfigRequest, DatabaseConfigResponse, DeleteDatabaseConfigResponse
 from app.schemas.secret import SecretReferenceRequest, SecretWriteRequest
-from app.services.secrets_manager_service import SecretManagerService
+from app.services.secrets_manager_service import SecretManagerError, SecretManagerService
+
+logger = logging.getLogger(__name__)
 
 
 class DatabaseConfigValidationError(ValueError):
@@ -26,14 +27,12 @@ class DatabaseConfigNotFoundError(ValueError):
     """Raised when a database config cannot be located."""
 
 
-def test_tcp_connectivity(host: str, port: int, timeout: int = 3) -> bool:
+def test_tcp_connectivity(host: str, port: int, timeout: int = 5) -> bool:
     """Test TCP socket reachability for the given host and port."""
-    if host.lower() in ("pending", "localhost-simulated", "simulated", "simulated-host"):
-        return True
     try:
         with socket.create_connection((host, port), timeout=timeout):
             return True
-    except Exception:
+    except (socket.timeout, socket.error, OSError):
         return False
 
 
@@ -47,7 +46,7 @@ class DatabaseConfigService:
     def create(self, payload: dict[str, Any] | None) -> DatabaseConfigResponse:
         try:
             create_request = CreateDatabaseConfigRequest.from_payload(payload)
-            
+
             # 1. Resolve AWS Connection
             aws_connection = None
             if create_request.aws_connection_id:
@@ -58,15 +57,10 @@ class DatabaseConfigService:
             # 2. Test database socket reachability
             connected = test_tcp_connectivity(create_request.host, create_request.port)
             if not connected:
-                is_simulated = True
-                if create_request.aws_connection_id:
-                    is_simulated = not (os.getenv("AWS_ACCESS_KEY_ID") and os.getenv("AWS_SECRET_ACCESS_KEY"))
-                if not is_simulated:
-                    raise DatabaseConfigValidationError(
-                        f"Database connection test failed. Unable to reach {create_request.host}:{create_request.port} via TCP."
-                    )
-                else:
-                    self._log_info(f"Database check failed for {create_request.host}:{create_request.port}, bypassed in simulated mode.")
+                self._log_info(f"Database TCP check failed for {create_request.host}:{create_request.port}")
+                raise DatabaseConfigValidationError(
+                    f"Database connection test failed. Unable to reach {create_request.host}:{create_request.port} via TCP."
+                )
 
             # 3. Store credentials or validate existing secret
             secret_arn = create_request.secret_arn
@@ -83,11 +77,12 @@ class DatabaseConfigService:
                         host=create_request.host,
                         port=create_request.port,
                         username=create_request.username,
-                        password=create_request.password or ""
+                        password=create_request.password or "",
+                        database_name=create_request.database_name,
                     )
                     self._log_info(f"Stored database password in AWS Secrets Manager: {secret_arn}")
-                except Exception as exc:
-                    raise DatabaseConfigValidationError(f"AWS Secrets Manager error: {exc}") from exc
+                except SecretManagerError as exc:
+                    raise DatabaseConfigValidationError(f"AWS Secrets Manager error: {exc.message}") from exc
 
             elif create_request.purpose == "DESTINATION":
                 if create_request.secret_arn or create_request.secret_name:
@@ -97,8 +92,8 @@ class DatabaseConfigService:
                         secret_id = create_request.secret_arn or create_request.secret_name
                         secret_arn = self._validate_existing_secret_in_aws(aws_connection, secret_id or "")
                         self._log_info(f"Validated existing destination database secret: {secret_arn}")
-                    except Exception as exc:
-                        raise DatabaseConfigValidationError(f"AWS Secrets Manager validation failed: {exc}") from exc
+                    except SecretManagerError as exc:
+                        raise DatabaseConfigValidationError(f"AWS Secrets Manager validation failed: {exc.message}") from exc
 
             config = DatabaseConfig(
                 name=create_request.name,
@@ -106,6 +101,7 @@ class DatabaseConfigService:
                 host=create_request.host,
                 port=create_request.port,
                 username=create_request.username,
+                database_name=create_request.database_name,
                 purpose=create_request.purpose,
                 aws_connection_id=create_request.aws_connection_id,
                 secret_arn=secret_arn,
@@ -144,6 +140,8 @@ class DatabaseConfigService:
             config.port = payload["port"]
         if "username" in payload and isinstance(payload["username"], str) and payload["username"].strip():
             config.username = payload["username"].strip()
+        if "database_name" in payload:
+            config.database_name = payload["database_name"].strip() if isinstance(payload["database_name"], str) and payload["database_name"].strip() else None
         if "purpose" in payload and isinstance(payload["purpose"], str) and payload["purpose"].strip():
             config.purpose = payload["purpose"].strip().upper()
         if "aws_connection_id" in payload:
@@ -210,14 +208,16 @@ class DatabaseConfigService:
             raise DatabaseConfigNotFoundError(f"Database config {database_config_id} was not found.")
         return config
 
-    def _store_secret_in_aws(self, aws_connection, db_name: str, db_type: str, host: str, port: int, username: str, password: str) -> tuple[str, str]:
+    def _store_secret_in_aws(self, aws_connection, db_name: str, db_type: str, host: str, port: int, username: str, password: str, database_name: str | None = None) -> tuple[str, str]:
         secret_payload = {
             "engine": db_type.lower(),
             "host": host,
             "port": port,
             "username": username,
-            "password": password
+            "password": password,
         }
+        if database_name:
+            secret_payload["dbname"] = database_name
         secret_name = f"cloudbridge/db-config/{db_name.lower().replace(' ', '-')}-{int(datetime.utcnow().timestamp())}"
         response = self._secrets_service.create(
             aws_connection, secret_name, secret_payload, f"Database credentials for CloudBridge: {db_name}"
@@ -228,8 +228,8 @@ class DatabaseConfigService:
         return self._secrets_service.validate(aws_connection, secret_id)
 
     def _log_info(self, message: str, database_config_id: int | None = None, name: str | None = None) -> None:
-        logger = current_app.logger
+        _logger = self._logger or current_app.logger
         if database_config_id is not None and name is not None:
-            logger.info("%s for database config %s (%s)", message, database_config_id, name)
+            _logger.info("%s for database config %s (%s)", message, database_config_id, name)
             return
-        logger.info(message)
+        _logger.info(message)

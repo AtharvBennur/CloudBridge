@@ -2,10 +2,12 @@ from flask import Blueprint, jsonify, request
 
 from app.middleware.auth import login_required
 from app.services.database_config_service import DatabaseConfigNotFoundError, DatabaseConfigService, DatabaseConfigValidationError
+from app.services.database_validation_service import DatabaseValidationError, DatabaseValidationService
 
 
 database_config_bp = Blueprint("database_config", __name__, url_prefix="/database-configs")
 database_config_service = DatabaseConfigService()
+database_validation_service = DatabaseValidationService()
 
 
 @database_config_bp.errorhandler(DatabaseConfigValidationError)
@@ -16,6 +18,20 @@ def handle_validation_error(error: DatabaseConfigValidationError):
 @database_config_bp.errorhandler(DatabaseConfigNotFoundError)
 def handle_not_found_error(error: DatabaseConfigNotFoundError):
     return jsonify({"error": {"message": str(error)}}), 404
+
+
+@database_config_bp.errorhandler(DatabaseValidationError)
+def handle_db_validation_error(error: DatabaseValidationError):
+    return jsonify({"error": {"message": str(error)}}), 400
+
+
+@database_config_bp.post('/validate')
+@login_required
+def validate_database_connection():
+    """Deep validation with table discovery, permission checks, and sample data preview."""
+    payload = request.get_json(silent=True) or {}
+    result = database_validation_service.validate(payload)
+    return jsonify(result), 200
 
 
 @database_config_bp.post('')

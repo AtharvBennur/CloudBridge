@@ -19,6 +19,7 @@ class CreateDatabaseConfigRequest:
     username: str
     password: str | None
     purpose: str
+    database_name: str | None = None
     aws_connection_id: int | None = None
     secret_arn: str | None = None
     secret_name: str | None = None
@@ -36,6 +37,7 @@ class CreateDatabaseConfigRequest:
         username = payload.get("username")
         password = payload.get("password")
         purpose = payload.get("purpose", "SOURCE")
+        database_name = payload.get("database_name")
         aws_connection_id = payload.get("aws_connection_id")
         secret_arn = payload.get("secret_arn")
         secret_name = payload.get("secret_name")
@@ -56,6 +58,8 @@ class CreateDatabaseConfigRequest:
         if normalized_purpose == "SOURCE":
             if not isinstance(password, str) or not password.strip():
                 raise ValueError("Password is required for source database configurations.")
+            if not isinstance(database_name, str) or not database_name.strip():
+                raise ValueError("database_name is required for source database configurations. This is the actual database name on the server.")
         else:
             if password is not None and (not isinstance(password, str) or not password.strip()):
                 password = None
@@ -78,6 +82,7 @@ class CreateDatabaseConfigRequest:
             username=username.strip(),
             password=password.strip() if password else None,
             purpose=normalized_purpose,
+            database_name=database_name.strip() if isinstance(database_name, str) and database_name.strip() else None,
             aws_connection_id=aws_connection_id,
             secret_arn=secret_arn.strip() if isinstance(secret_arn, str) and secret_arn.strip() else None,
             secret_name=secret_name.strip() if isinstance(secret_name, str) and secret_name.strip() else None,
@@ -95,6 +100,7 @@ class DatabaseConfigResponse:
     host: str
     port: int
     username: str
+    database_name: str | None
     purpose: str
     aws_connection_id: int | None
     secret_arn: str | None
@@ -111,6 +117,7 @@ class DatabaseConfigResponse:
             "host": self.host,
             "port": self.port,
             "username": self.username,
+            "database_name": self.database_name,
             "purpose": self.purpose,
             "aws_connection_id": self.aws_connection_id,
             "secret_arn": self.secret_arn,
@@ -129,6 +136,7 @@ class DatabaseConfigResponse:
             host=config.host,
             port=config.port,
             username=config.username,
+            database_name=config.database_name,
             purpose=config.purpose,
             aws_connection_id=config.aws_connection_id,
             secret_arn=config.secret_arn,

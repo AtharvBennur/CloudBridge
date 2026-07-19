@@ -143,6 +143,15 @@ def disconnect_aws_connection_by_id(aws_connection_id: int):
     return jsonify(response), 200
 
 
+@aws_connection_bp.post('/<int:aws_connection_id>/register-role-arn')
+@login_required
+def register_role_arn(aws_connection_id: int):
+    """Register the IAM Role ARN after CloudFormation stack deployment."""
+    payload = request.get_json(silent=True)
+    response = aws_connection_service.register_role_arn(aws_connection_id, payload)
+    return jsonify(response.to_dict()), 200
+
+
 @aws_connection_bp.get('/<int:aws_connection_id>/cloudformation-template')
 @login_required
 def get_cloudformation_template(aws_connection_id: int):

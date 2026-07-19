@@ -27,7 +27,7 @@ class AWSConnectionValidation:
     """Reusable validation helpers for AWS connection payloads."""
 
     AWS_ACCOUNT_ID_PATTERN = re.compile(r"^\d{12}$")
-    ROLE_ARN_PATTERN = re.compile(r"^arn:aws(?:-[a-z]+)?:iam::\d{12}:role/.+")
+    ROLE_ARN_PATTERN = re.compile(r"^arn:aws(?:-[a-z]+)?:iam:{1,2}\d{12}:role/.+")
     REGION_PATTERN = re.compile(r"^[a-z]{2}(?:-[a-z]+){1,3}-\d+$")
 
     @classmethod
@@ -91,11 +91,15 @@ class ConnectAWSConnectionRequest:
 
 @dataclass(frozen=True)
 class CreateAWSConnectionRequest:
-    """Represents the payload required to create a new AWS connection."""
+    """Represents the payload required to create a new AWS connection.
+
+    Role ARN is optional at creation time — it can be registered later
+    after the customer deploys the CloudFormation stack.
+    """
 
     aws_account_id: str
     aws_region: str
-    role_arn: str
+    role_arn: str | None
 
     @classmethod
     def from_payload(cls, payload: dict[str, Any] | None) -> "CreateAWSConnectionRequest":
@@ -105,13 +109,31 @@ class CreateAWSConnectionRequest:
 
         aws_account_id = AWSConnectionValidation.validate_aws_account_id(payload.get("aws_account_id"))
         aws_region = AWSConnectionValidation.validate_aws_region(payload.get("aws_region"))
-        role_arn = AWSConnectionValidation.validate_role_arn(payload.get("role_arn"))
+
+        raw_role_arn = payload.get("role_arn")
+        role_arn = None
+        if raw_role_arn and str(raw_role_arn).strip():
+            role_arn = AWSConnectionValidation.validate_role_arn(raw_role_arn)
 
         return cls(
             aws_account_id=aws_account_id,
             aws_region=aws_region,
             role_arn=role_arn,
         )
+
+
+@dataclass(frozen=True)
+class RegisterRoleArnRequest:
+    """Represents the payload for registering a Role ARN after CF stack deployment."""
+
+    role_arn: str
+
+    @classmethod
+    def from_payload(cls, payload: dict[str, Any] | None) -> "RegisterRoleArnRequest":
+        if not isinstance(payload, dict):
+            raise ValueError("Request body must be a JSON object.")
+        role_arn = AWSConnectionValidation.validate_role_arn(payload.get("role_arn"))
+        return cls(role_arn=role_arn)
 
 
 @dataclass(frozen=True)
@@ -151,7 +173,7 @@ class UpdateAWSConnectionRequest:
                 raise ValueError("Connection status must be a non-empty string.")
             normalized_status = connection_status.strip().upper()
             if normalized_status not in AWSConnectionStatus.VALUES:
-                raise ValueError("Connection status must be one of: PENDING, CONNECTED, DISCONNECTED.")
+                raise ValueError("Connection status must be one of: PENDING, CONNECTED, DISCONNECTED, FAILED.")
             connection_status = normalized_status
 
         return cls(
@@ -169,9 +191,10 @@ class AWSConnectionResponse:
     id: int
     aws_account_id: str
     aws_region: str
-    role_arn: str
+    role_arn: str | None
     external_id: str
     connection_status: str
+    last_validated_at: str | None
     created_at: str
     updated_at: str
 
@@ -181,9 +204,10 @@ class AWSConnectionResponse:
             "id": self.id,
             "aws_account_id": self.aws_account_id,
             "aws_region": self.aws_region,
-            "role_arn": self.role_arn,
+            "role_arn": self.role_arn or "",
             "external_id": self.external_id,
             "connection_status": self.connection_status,
+            "last_validated_at": self.last_validated_at or "",
             "created_at": self.created_at,
             "updated_at": self.updated_at,
         }
@@ -198,6 +222,7 @@ class AWSConnectionResponse:
             role_arn=connection.role_arn,
             external_id=connection.external_id,
             connection_status=connection.connection_status,
+            last_validated_at=connection.last_validated_at.isoformat() if connection.last_validated_at else None,
             created_at=connection.created_at.isoformat() if connection.created_at else "",
             updated_at=connection.updated_at.isoformat() if connection.updated_at else "",
         )
