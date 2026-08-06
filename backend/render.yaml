@@ -5,20 +5,10 @@ services:
     buildCommand: pip install -r requirements.txt
     startCommand: gunicorn --worker-class eventlet -w 1 --bind 0.0.0.0:$PORT wsgi:app
     envVars:
-      - key: DATABASE_URL
-        fromDatabase:
-          name: cloudbridge-db
-          property: connectionString
-      - key: FLASK_ENV
-        value: production
-      - key: FLASK_DEBUG
-        value: 0
-      - key: SECRET_KEY
-        generateValue: true
       - key: API_BASE_URL
-        sync: false
+        value: https://cloudbridge-2-a0fp.onrender.com
       - key: API_HOST
-        sync: false
+        value: cloudbridge-2-a0fp.onrender.com
       - key: API_PORT
         value: 443
       - key: API_PROTOCOL
@@ -40,16 +30,13 @@ services:
       - key: COGNITO_IDENTITY_POOL_ID
         sync: false
       - key: CORS_ORIGINS
-        value: https://cloudbridge-frontend.onrender.com
+        value: https://cloudbridge-2-a0fp.onrender.com,http://localhost:5173,http://localhost:5174
       - key: LOG_LEVEL
         value: INFO
       - key: ECS_CLUSTER_NAME
         value: cloudbridge-migration-cluster
       - key: CLOUDWATCH_LOG_GROUP
         value: /aws/ecs/cloudbridge-migration-workers
-    disk:
-      name: data
-      mountPath: /opt/render/project/data
 databases:
   - name: cloudbridge-db
     databaseName: cloudbridge
