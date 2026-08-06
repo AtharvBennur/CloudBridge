@@ -1,0 +1,56 @@
+services:
+  - type: web
+    name: cloudbridge-backend
+    env: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn --worker-class eventlet -w 1 --bind 0.0.0.0:$PORT app:app
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: cloudbridge-db
+          property: connectionString
+      - key: FLASK_ENV
+        value: production
+      - key: FLASK_DEBUG
+        value: 0
+      - key: SECRET_KEY
+        generateValue: true
+      - key: API_BASE_URL
+        sync: false
+      - key: API_HOST
+        sync: false
+      - key: API_PORT
+        value: 443
+      - key: API_PROTOCOL
+        value: https
+      - key: AWS_ACCESS_KEY_ID
+        sync: false
+      - key: AWS_SECRET_ACCESS_KEY
+        sync: false
+      - key: AWS_DEFAULT_REGION
+        value: us-east-1
+      - key: CLOUDBRIDGE_AWS_ACCOUNT_ID
+        sync: false
+      - key: COGNITO_REGION
+        sync: false
+      - key: COGNITO_USER_POOL_ID
+        sync: false
+      - key: COGNITO_CLIENT_ID
+        sync: false
+      - key: COGNITO_IDENTITY_POOL_ID
+        sync: false
+      - key: CORS_ORIGINS
+        value: https://cloudbridge-frontend.onrender.com
+      - key: LOG_LEVEL
+        value: INFO
+      - key: ECS_CLUSTER_NAME
+        value: cloudbridge-migration-cluster
+      - key: CLOUDWATCH_LOG_GROUP
+        value: /aws/ecs/cloudbridge-migration-workers
+    disk:
+      name: data
+      mountPath: /opt/render/project/data
+databases:
+  - name: cloudbridge-db
+    databaseName: cloudbridge
+    user: cloudbridge
