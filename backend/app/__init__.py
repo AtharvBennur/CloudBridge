@@ -49,9 +49,6 @@ def create_app(config_name: str | None = None) -> Flask:
     app.logger.info("CloudBridge backend started with %s config", app.config["ENV_NAME"])
     return app
 
-# Create app instance for gunicorn
-app = create_app()
-
 
 def register_extensions(app: Flask) -> None:
     db.init_app(app)
