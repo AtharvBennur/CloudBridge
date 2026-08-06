@@ -135,11 +135,15 @@ def test_validate_endpoint_missing_fields():
     assert response.status_code == 400
 
 
-@patch("app.services.database_validation_service.DatabaseValidationService._test_tcp", return_value=False)
-def test_validate_source_tcp_failure(mock_tcp):
-    """Source validation returns failed when TCP check fails."""
+@patch("app.services.database_validation_service.get_validator")
+def test_validate_source_tcp_failure(mock_get_validator):
+    """Source validation returns failed when connection fails."""
     app = create_app("testing")
     client = app.test_client()
+
+    mock_validator = MagicMock()
+    mock_validator.connect.side_effect = Exception("MySQL connection failed (error 2003): Can't connect to MySQL server (10060)")
+    mock_get_validator.return_value = mock_validator
 
     response = client.post(
         "/database-configs/validate",
@@ -161,8 +165,7 @@ def test_validate_source_tcp_failure(mock_tcp):
 
 
 @patch("app.services.database_validation_service.get_validator")
-@patch("app.services.database_validation_service.DatabaseValidationService._test_tcp", return_value=True)
-def test_postgresql_source_validation(mock_tcp, mock_get_validator):
+def test_postgresql_source_validation(mock_get_validator):
     """Full PostgreSQL source validation with mocked connection."""
     app = create_app("testing")
     client = app.test_client()
@@ -174,6 +177,7 @@ def test_postgresql_source_validation(mock_tcp, mock_get_validator):
     mock_validator.validate_permissions.return_value = {"SELECT": True, "INSERT": True, "CREATE": True}
     mock_validator.discover_tables.return_value = ["employees", "departments"]
     mock_validator.get_table_row_count.return_value = 100
+    mock_validator.execute_verify_query.return_value = None
     mock_validator.fetch_sample_rows.return_value = (
         ["id", "first_name", "department", "salary"],
         [
@@ -216,8 +220,7 @@ def test_postgresql_source_validation(mock_tcp, mock_get_validator):
 
 
 @patch("app.services.database_validation_service.get_validator")
-@patch("app.services.database_validation_service.DatabaseValidationService._test_tcp", return_value=True)
-def test_mysql_source_validation(mock_tcp, mock_get_validator):
+def test_mysql_source_validation(mock_get_validator):
     """MySQL source validation with mocked connection."""
     app = create_app("testing")
     client = app.test_client()
@@ -228,6 +231,7 @@ def test_mysql_source_validation(mock_tcp, mock_get_validator):
     mock_validator.validate_permissions.return_value = {"SELECT": True, "INSERT": True, "CREATE": True}
     mock_validator.discover_tables.return_value = ["users"]
     mock_validator.get_table_row_count.return_value = 50
+    mock_validator.execute_verify_query.return_value = None
     mock_validator.fetch_sample_rows.return_value = (
         ["id", "email", "phone"],
         [
@@ -262,8 +266,7 @@ def test_mysql_source_validation(mock_tcp, mock_get_validator):
 
 
 @patch("app.services.database_validation_service.get_validator")
-@patch("app.services.database_validation_service.DatabaseValidationService._test_tcp", return_value=True)
-def test_source_validation_returns_structured_failure_when_preview_errors(mock_tcp, mock_get_validator):
+def test_source_validation_returns_structured_failure_when_preview_errors(mock_get_validator):
     """Preview-stage exceptions should return a failed validation response, not a 500."""
     app = create_app("testing")
     client = app.test_client()
@@ -273,6 +276,7 @@ def test_source_validation_returns_structured_failure_when_preview_errors(mock_t
     mock_validator.database_exists.return_value = True
     mock_validator.validate_permissions.return_value = {"SELECT": True, "INSERT": True, "CREATE": True}
     mock_validator.discover_tables.return_value = ["employees"]
+    mock_validator.execute_verify_query.return_value = None
     mock_validator.get_table_row_count.return_value = 100
     mock_validator.fetch_sample_rows.side_effect = Exception("Access denied for table 'employees'")
     mock_get_validator.return_value = mock_validator
@@ -301,9 +305,8 @@ def test_source_validation_returns_structured_failure_when_preview_errors(mock_t
 
 
 @patch("app.services.database_validation_service.get_validator")
-@patch("app.services.database_validation_service.DatabaseValidationService._test_tcp", return_value=True)
-def test_destination_validation(mock_tcp, mock_get_validator):
-    """Destination validation returns permission checks."""
+def test_destination_validation(mock_get_validator):
+    """Destination validation returns permission checks with SQL execution verification."""
     app = create_app("testing")
     client = app.test_client()
 
@@ -311,6 +314,8 @@ def test_destination_validation(mock_tcp, mock_get_validator):
     mock_validator.validate_connection.return_value = True
     mock_validator.database_exists.return_value = True
     mock_validator.validate_permissions.return_value = {"SELECT": True, "INSERT": True, "CREATE": True}
+    mock_validator.discover_tables.return_value = ["table1", "table2"]
+    mock_validator.execute_verify_query.return_value = None
     mock_get_validator.return_value = mock_validator
 
     response = client.post(
@@ -333,12 +338,15 @@ def test_destination_validation(mock_tcp, mock_get_validator):
     assert data["databaseExists"] is True
     assert data["writePermission"] is True
     assert data["readPermission"] is True
-    assert len(data["checks"]) >= 4
+    assert len(data["checks"]) >= 6  # auth, db_exists, read_perm, write_perm, table_accessibility, verify_query
+    
+    # Verify that discover_tables and execute_verify_query were called
+    mock_validator.discover_tables.assert_called_once()
+    mock_validator.execute_verify_query.assert_called_once()
 
 
 @patch("app.services.database_validation_service.get_validator")
-@patch("app.services.database_validation_service.DatabaseValidationService._test_tcp", return_value=True)
-def test_validate_endpoint_returns_masked_data(mock_tcp, mock_get_validator):
+def test_validate_endpoint_returns_masked_data(mock_get_validator):
     """Verify that password columns are NEVER returned in sample data."""
     app = create_app("testing")
     client = app.test_client()

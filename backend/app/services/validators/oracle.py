@@ -158,3 +158,15 @@ class OracleValidator(BaseDatabaseValidator):
         except Exception:
             pass
         return None
+
+    def execute_verify_query(self) -> None:
+        """Execute a verification query to ensure connection is genuinely working."""
+        logger.debug("Executing verification query: SELECT * FROM V$VERSION WHERE ROWNUM = 1")
+        try:
+            with self._connection.cursor() as cur:
+                cur.execute("SELECT * FROM V$VERSION WHERE ROWNUM = 1")
+                result = cur.fetchone()
+                logger.debug("✓ Verification query successful: Oracle version %s", result)
+        except Exception as exc:
+            logger.error("✗ Verification query failed: %s", exc)
+            raise

@@ -11,14 +11,14 @@ from typing import Dict
 
 from flask import Flask
 
-from app.workers.local_worker import LocalSimulationWorker
+from app.workers.local_worker import LocalMigrationWorker
 
 
 class MigrationWorkerManager:
     """Manages active background migration workers."""
 
     def __init__(self) -> None:
-        self._workers: dict[int, LocalSimulationWorker] = {}
+        self._workers: dict[int, LocalMigrationWorker] = {}
         self._lock = threading.Lock()
 
     def start_worker(self, app: Flask, migration_id: int) -> bool:
@@ -31,7 +31,7 @@ class MigrationWorkerManager:
                 app.logger.warning(f"Worker for migration {migration_id} is already running.")
                 return False
 
-            worker = LocalSimulationWorker(app, migration_id)
+            worker = LocalMigrationWorker(app, migration_id)
             self._workers[migration_id] = worker
             worker.start()
             return True
@@ -62,7 +62,7 @@ class MigrationWorkerManager:
         """Start a fresh worker for a failed job; checkpoints preserve progress."""
         return self.start_worker(app, migration_id)
 
-    def get_active_worker(self, migration_id: int) -> LocalSimulationWorker | None:
+    def get_active_worker(self, migration_id: int) -> LocalMigrationWorker | None:
         """Get the active worker instance if it is currently running."""
         with self._lock:
             worker = self._workers.get(migration_id)

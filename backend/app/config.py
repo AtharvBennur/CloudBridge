@@ -45,6 +45,12 @@ class BaseConfig:
         if origin.strip()
     ]
     LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO")
+    
+    # API Configuration
+    API_BASE_URL = os.getenv("API_BASE_URL", "http://localhost:5000")
+    API_HOST = os.getenv("API_HOST", "localhost")
+    API_PORT = _get_int("API_PORT", 5000)
+    API_PROTOCOL = os.getenv("API_PROTOCOL", "http")
 
     # AWS Configuration
     COGNITO_REGION = os.getenv("COGNITO_REGION", "")

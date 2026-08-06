@@ -99,21 +99,31 @@ class MigrationExecutionService:
         # ── Reset migration state for fresh execution ───────────────────────
         self._reset_migration_state(migration)
 
-        # ── Validate database configs have database_name ────────────────────
-        if migration.source_database_config_id:
-            src = DatabaseConfig.query.get(migration.source_database_config_id)
-            if src and not src.database_name:
-                raise ECSValidationError(
-                    f"Source database config '{src.name}' (ID {src.id}) has no database_name set. "
-                    "Edit the database config and provide the actual database name on the server."
-                )
-        if migration.destination_database_config_id:
-            dst = DatabaseConfig.query.get(migration.destination_database_config_id)
-            if dst and not dst.database_name:
-                raise ECSValidationError(
-                    f"Destination database config '{dst.name}' (ID {dst.id}) has no database_name set. "
-                    "Edit the database config and provide the actual database name on the server."
-                )
+        # ── Validate database configs are linked & have database_name ──────────────
+        if not migration.source_database_config_id:
+            raise ECSValidationError(
+                "Migration job has no source database configuration linked. "
+                "Edit the migration job and select a source database before launching."
+            )
+        if not migration.destination_database_config_id:
+            raise ECSValidationError(
+                "Migration job has no destination database configuration linked. "
+                "Edit the migration job and select a destination database before launching."
+            )
+
+        src = DatabaseConfig.query.get(migration.source_database_config_id)
+        if src and not src.database_name:
+            raise ECSValidationError(
+                f"Source database config '{src.name}' (ID {src.id}) has no database_name set. "
+                "Edit the database config and provide the actual database name on the server."
+            )
+
+        dst = DatabaseConfig.query.get(migration.destination_database_config_id)
+        if dst and not dst.database_name:
+            raise ECSValidationError(
+                f"Destination database config '{dst.name}' (ID {dst.id}) has no database_name set. "
+                "Edit the database config and provide the actual database name on the server."
+            )
 
         # ── Resolve AWS connection ──────────────────────────────────────────
         effective_connection_id = aws_connection_id or migration.aws_connection_id
@@ -127,7 +137,7 @@ class MigrationExecutionService:
                 f"AWS connection {aws_connection.id} has no role ARN. Complete the connection setup first."
             )
 
-        # ── Create placeholder ECS task record ─────────────────────────────
+        # ── Create ECS task record ─────────────────────────────
         task = ECSTask(
             migration_id=migration.id,
             aws_connection_id=aws_connection.id,
@@ -178,7 +188,17 @@ class MigrationExecutionService:
             try:
                 self._do_execute(task_id, migration_id, aws_connection_id)
             except Exception as exc:
-                logger.exception("Background migration execution failed: %s", exc)
+                logger.exception(
+                    "Background migration execution failed",
+                    exc_info=True,
+                    extra={
+                        "task_id": task_id,
+                        "migration_id": migration_id,
+                        "aws_connection_id": aws_connection_id,
+                        "error_type": type(exc).__name__,
+                        "error_message": str(exc),
+                    }
+                )
                 # Mark task and migration as failed
                 task = db.session.get(ECSTask, task_id)
                 migration = db.session.get(MigrationJob, migration_id)
@@ -359,33 +379,46 @@ class MigrationExecutionService:
         aws_connection: AWSConnection,
     ) -> list[dict[str, str]]:
         """Build environment variables for the worker container."""
+        # Construct API URL from available config
+        api_base_url = current_app.config.get("API_BASE_URL", "")
+        if not api_base_url:
+            # Fallback to constructing from host/port/protocol
+            api_host = current_app.config.get("API_HOST", "localhost")
+            api_port = current_app.config.get("API_PORT", 5000)
+            api_protocol = current_app.config.get("API_PROTOCOL", "http")
+            api_base_url = f"{api_protocol}://{api_host}:{api_port}"
+        
         env_vars = [
-            {"name": "CLOUDBRIDGE_API_URL", "value": current_app.config.get("API_BASE_URL", "")},
+            {"name": "CLOUDBRIDGE_API_URL", "value": api_base_url},
             {"name": "MIGRATION_ID", "value": str(migration.id)},
             {"name": "AWS_CONNECTION_ID", "value": str(aws_connection.id)},
             {"name": "AWS_DEFAULT_REGION", "value": aws_connection.aws_region},
         ]
 
         if migration.source_database_config_id:
-            src = DatabaseConfig.query.get(migration.source_database_config_id)
+            src = db.session.get(DatabaseConfig, migration.source_database_config_id)
             if src:
                 env_vars.extend([
                     {"name": "SOURCE_DB_HOST", "value": src.host},
                     {"name": "SOURCE_DB_PORT", "value": str(src.port)},
                     {"name": "SOURCE_DB_USERNAME", "value": src.username},
+                    {"name": "SOURCE_DB_PASSWORD", "value": src.password or ""},
                     {"name": "SOURCE_DB_NAME", "value": src.database_name or src.name},
+                    {"name": "SOURCE_DB_ENGINE", "value": src.database_type or "POSTGRESQL"},
                 ])
                 if src.secret_arn:
                     env_vars.append({"name": "SOURCE_DB_SECRET_ARN", "value": src.secret_arn})
 
         if migration.destination_database_config_id:
-            dst = DatabaseConfig.query.get(migration.destination_database_config_id)
+            dst = db.session.get(DatabaseConfig, migration.destination_database_config_id)
             if dst:
                 env_vars.extend([
                     {"name": "DEST_DB_HOST", "value": dst.host},
                     {"name": "DEST_DB_PORT", "value": str(dst.port)},
                     {"name": "DEST_DB_USERNAME", "value": dst.username},
+                    {"name": "DEST_DB_PASSWORD", "value": dst.password or ""},
                     {"name": "DEST_DB_NAME", "value": dst.database_name or dst.name},
+                    {"name": "DEST_DB_ENGINE", "value": dst.database_type or "POSTGRESQL"},
                 ])
                 if dst.secret_arn:
                     env_vars.append({"name": "DEST_DB_SECRET_ARN", "value": dst.secret_arn})

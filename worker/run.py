@@ -28,9 +28,34 @@ from datetime import datetime
 from typing import Any
 
 import boto3
-import psycopg2
 import requests
 from botocore.exceptions import ClientError
+
+# Database drivers - support both PostgreSQL and MySQL
+try:
+    import psycopg2
+    import psycopg2.extras
+    POSTGRESQL_AVAILABLE = True
+except ImportError:
+    POSTGRESQL_AVAILABLE = False
+
+try:
+    import pymysql
+    import pymysql.cursors
+    MYSQL_AVAILABLE = True
+except ImportError:
+    MYSQL_AVAILABLE = False
+
+# Required environment variables
+CLOUDBRIDGE_API_URL = os.getenv("CLOUDBRIDGE_API_URL")
+if not CLOUDBRIDGE_API_URL:
+    logging.error("CLOUDBRIDGE_API_URL is not set - cannot contact CloudBridge API")
+    sys.exit(1)
+
+MIGRATION_ID = os.getenv("MIGRATION_ID")
+if not MIGRATION_ID:
+    logging.error("MIGRATION_ID is not set - cannot proceed")
+    sys.exit(1)
 
 logging.basicConfig(
     level=logging.INFO,
@@ -43,24 +68,26 @@ logger = logging.getLogger("migration-worker")
 # Configuration
 # ---------------------------------------------------------------------------
 
-API_URL = os.environ.get("CLOUDBRIDGE_API_URL", "").rstrip("/")
-MIGRATION_ID = os.environ.get("MIGRATION_ID", "")
-AWS_CONNECTION_ID = os.environ.get("AWS_CONNECTION_ID", "")
+API_URL = CLOUDBRIDGE_API_URL.rstrip("/")
 AWS_REGION = os.environ.get("AWS_DEFAULT_REGION", "us-east-1")
 
 # Source DB credentials (passed as env vars by ECS task)
 SOURCE_DB_HOST = os.environ.get("SOURCE_DB_HOST", "")
 SOURCE_DB_PORT = int(os.environ.get("SOURCE_DB_PORT", "5432"))
 SOURCE_DB_USERNAME = os.environ.get("SOURCE_DB_USERNAME", "")
+SOURCE_DB_PASSWORD = os.environ.get("SOURCE_DB_PASSWORD", "")
 SOURCE_DB_NAME = os.environ.get("SOURCE_DB_NAME", "")
 SOURCE_DB_SECRET_ARN = os.environ.get("SOURCE_DB_SECRET_ARN", "")
+SOURCE_DB_ENGINE = os.environ.get("SOURCE_DB_ENGINE", "POSTGRESQL").upper()  # POSTGRESQL or MYSQL
 
 # Destination DB credentials (passed as env vars by ECS task)
 DEST_DB_HOST = os.environ.get("DEST_DB_HOST", "")
 DEST_DB_PORT = int(os.environ.get("DEST_DB_PORT", "5432"))
 DEST_DB_USERNAME = os.environ.get("DEST_DB_USERNAME", "")
+DEST_DB_PASSWORD = os.environ.get("DEST_DB_PASSWORD", "")
 DEST_DB_NAME = os.environ.get("DEST_DB_NAME", "")
 DEST_DB_SECRET_ARN = os.environ.get("DEST_DB_SECRET_ARN", "")
+DEST_DB_ENGINE = os.environ.get("DEST_DB_ENGINE", "POSTGRESQL").upper()  # POSTGRESQL or MYSQL
 
 BATCH_SIZE = int(os.environ.get("BATCH_SIZE", "5000"))
 PROGRESS_REPORT_INTERVAL = int(os.environ.get("PROGRESS_REPORT_INTERVAL", "5000"))
@@ -113,7 +140,7 @@ def get_source_credentials() -> dict[str, Any]:
         "host": SOURCE_DB_HOST,
         "port": SOURCE_DB_PORT,
         "username": SOURCE_DB_USERNAME,
-        "password": os.environ.get("SOURCE_DB_PASSWORD", ""),
+        "password": SOURCE_DB_PASSWORD,
         "database": SOURCE_DB_NAME,
     }
 
@@ -133,7 +160,7 @@ def get_destination_credentials() -> dict[str, Any]:
         "host": DEST_DB_HOST,
         "port": DEST_DB_PORT,
         "username": DEST_DB_USERNAME,
-        "password": os.environ.get("DEST_DB_PASSWORD", ""),
+        "password": DEST_DB_PASSWORD,
         "database": DEST_DB_NAME,
     }
 
@@ -143,72 +170,155 @@ def get_destination_credentials() -> dict[str, Any]:
 # ---------------------------------------------------------------------------
 
 
-def get_connection_string(creds: dict[str, Any]) -> str:
-    return (
-        f"host={creds['host']} port={creds['port']} "
-        f"dbname={creds['database']} user={creds['username']} "
-        f"password={creds['password']} sslmode=require connect_timeout=10"
-    )
+def get_connection_string(creds: dict[str, Any], engine: str = "POSTGRESQL") -> str:
+    """Build connection string based on database engine."""
+    if engine == "MYSQL":
+        return (
+            f"host={creds['host']} port={creds['port']} "
+            f"dbname={creds['database']} user={creds['username']} "
+            f"password={creds['password']} connect_timeout=10"
+        )
+    else:  # POSTGRESQL (default)
+        return (
+            f"host={creds['host']} port={creds['port']} "
+            f"dbname={creds['database']} user={creds['username']} "
+            f"password={creds['password']} sslmode=require connect_timeout=10"
+        )
 
 
-def discover_tables(conn) -> list[str]:
+def get_db_connection(creds: dict[str, Any], engine: str = "POSTGRESQL"):
+    """Get database connection based on engine type."""
+    if engine == "MYSQL":
+        if not MYSQL_AVAILABLE:
+            raise RuntimeError("PyMySQL is not installed. Cannot connect to MySQL database.")
+        logger.info(f"Connecting to MySQL: {creds['host']}:{creds['port']} as {creds['username']}")
+        conn = pymysql.connect(
+            host=creds['host'],
+            port=creds['port'],
+            user=creds['username'],
+            password=creds['password'],
+            database=creds['database'],
+            connect_timeout=10,
+            cursorclass=pymysql.cursors.DictCursor,
+            charset='utf8mb4',
+        )
+        return conn
+    else:  # POSTGRESQL (default)
+        if not POSTGRESQL_AVAILABLE:
+            raise RuntimeError("psycopg2 is not installed. Cannot connect to PostgreSQL database.")
+        logger.info(f"Connecting to PostgreSQL: {creds['host']}:{creds['port']} as {creds['username']}")
+        conn = psycopg2.connect(get_connection_string(creds, engine))
+        conn.autocommit = False
+        return conn
+
+
+def discover_tables(conn, engine: str = "POSTGRESQL") -> list[str]:
     """Return list of user tables in the source database."""
-    with conn.cursor() as cur:
-        cur.execute(
-            """
-            SELECT table_name FROM information_schema.tables
-            WHERE table_schema = 'public' AND table_type = 'BASE TABLE'
-            ORDER BY table_name
-            """
-        )
-        return [row[0] for row in cur.fetchall()]
-
-
-def get_table_row_count(conn, table: str) -> int:
-    with conn.cursor() as cur:
-        cur.execute(f'SELECT COUNT(*) FROM "{table}"')
-        return cur.fetchone()[0]
-
-
-def get_table_columns(conn, table: str) -> list[tuple[str, str]]:
-    """Return list of (column_name, data_type) for a table."""
-    with conn.cursor() as cur:
-        cur.execute(
-            """
-            SELECT column_name, data_type FROM information_schema.columns
-            WHERE table_schema = 'public' AND table_name = %s
-            ORDER BY ordinal_position
-            """,
-            (table,),
-        )
-        return cur.fetchall()
-
-
-def create_table_if_not_exists(dest_conn, src_conn, table: str) -> None:
-    """Create the table on destination if it doesn't exist, matching source schema."""
-    with dest_conn.cursor() as cur:
-        cur.execute(
-            """
-            SELECT EXISTS (
-                SELECT 1 FROM information_schema.tables
-                WHERE table_schema = 'public' AND table_name = %s
+    if engine == "MYSQL":
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                SELECT table_name FROM information_schema.tables
+                WHERE table_schema = DATABASE() AND table_type = 'BASE TABLE'
+                ORDER BY table_name
+                """
             )
-            """,
-            (table,),
-        )
-        exists = cur.fetchone()[0]
+            return [row['table_name'] for row in cur.fetchall()]
+    else:  # POSTGRESQL
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                SELECT table_name FROM information_schema.tables
+                WHERE table_schema = 'public' AND table_type = 'BASE TABLE'
+                ORDER BY table_name
+                """
+            )
+            return [row[0] for row in cur.fetchall()]
+
+
+def get_table_row_count(conn, table: str, engine: str = "POSTGRESQL") -> int:
+    if engine == "MYSQL":
+        with conn.cursor() as cur:
+            cur.execute(f'SELECT COUNT(*) as cnt FROM `{table}`')
+            result = cur.fetchone()
+            return result['cnt'] if isinstance(result, dict) else result[0]
+    else:  # POSTGRESQL
+        with conn.cursor() as cur:
+            cur.execute(f'SELECT COUNT(*) FROM "{table}"')
+            return cur.fetchone()[0]
+
+
+def get_table_columns(conn, table: str, engine: str = "POSTGRESQL") -> list[tuple[str, str]]:
+    """Return list of (column_name, data_type) for a table."""
+    if engine == "MYSQL":
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                SELECT column_name, data_type FROM information_schema.columns
+                WHERE table_schema = DATABASE() AND table_name = %s
+                ORDER BY ordinal_position
+                """,
+                (table,),
+            )
+            return [(row['column_name'], row['data_type']) for row in cur.fetchall()]
+    else:  # POSTGRESQL
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                SELECT column_name, data_type FROM information_schema.columns
+                WHERE table_schema = 'public' AND table_name = %s
+                ORDER BY ordinal_position
+                """,
+                (table,),
+            )
+            return cur.fetchall()
+
+
+def create_table_if_not_exists(dest_conn, src_conn, table: str, src_engine: str = "POSTGRESQL", dest_engine: str = "POSTGRESQL") -> None:
+    """Create the table on destination if it doesn't exist, matching source schema."""
+    # Check if table exists on destination
+    if dest_engine == "MYSQL":
+        with dest_conn.cursor() as cur:
+            cur.execute(
+                """
+                SELECT EXISTS (
+                    SELECT 1 FROM information_schema.tables
+                    WHERE table_schema = DATABASE() AND table_name = %s
+                ) as exists
+                """,
+                (table,),
+            )
+            result = cur.fetchone()
+            exists = result['exists'] if isinstance(result, dict) else result[0]
+    else:  # POSTGRESQL
+        with dest_conn.cursor() as cur:
+            cur.execute(
+                """
+                SELECT EXISTS (
+                    SELECT 1 FROM information_schema.tables
+                    WHERE table_schema = 'public' AND table_name = %s
+                )
+                """,
+                (table,),
+            )
+            exists = cur.fetchone()[0]
 
     if exists:
         logger.info("Table '%s' already exists on destination", table)
         return
 
-    columns = get_table_columns(src_conn, table)
+    columns = get_table_columns(src_conn, table, src_engine)
     if not columns:
         logger.warning("Table '%s' has no columns, skipping", table)
         return
 
-    col_defs = ", ".join(f'"{name}" {dtype.upper()}' for name, dtype in columns)
-    create_sql = f'CREATE TABLE IF NOT EXISTS "{table}" ({col_defs})'
+    # Build CREATE TABLE statement based on destination engine
+    if dest_engine == "MYSQL":
+        col_defs = ", ".join(f'`{name}` {dtype.upper()}' for name, dtype in columns)
+        create_sql = f'CREATE TABLE IF NOT EXISTS `{table}` ({col_defs})'
+    else:  # POSTGRESQL
+        col_defs = ", ".join(f'"{name}" {dtype.upper()}' for name, dtype in columns)
+        create_sql = f'CREATE TABLE IF NOT EXISTS "{table}" ({col_defs})'
 
     with dest_conn.cursor() as cur:
         cur.execute(create_sql)
@@ -223,11 +333,19 @@ def copy_table_in_batches(
     migration_id: int,
     total_rows: int,
     rows_already_migrated: int,
+    src_engine: str = "POSTGRESQL",
+    dest_engine: str = "POSTGRESQL",
 ) -> int:
     """Copy rows from source to destination in batches. Returns rows copied."""
-    columns = get_table_columns(src_conn, table)
+    columns = get_table_columns(src_conn, table, src_engine)
     col_names = [c[0] for c in columns]
-    col_list = ", ".join(f'"{c}"' for c in col_names)
+    
+    # Build column list and placeholders based on engine
+    if src_engine == "MYSQL":
+        col_list = ", ".join(f'`{c}`' for c in col_names)
+    else:  # POSTGRESQL
+        col_list = ", ".join(f'"{c}"' for c in col_names)
+    
     placeholders = ", ".join(["%s"] * len(col_names))
 
     rows_copied = 0
@@ -235,10 +353,16 @@ def copy_table_in_batches(
 
     while True:
         with src_conn.cursor() as cur:
-            cur.execute(
-                f'SELECT {col_list} FROM "{table}" LIMIT %s OFFSET %s',
-                (BATCH_SIZE, offset),
-            )
+            if src_engine == "MYSQL":
+                cur.execute(
+                    f'SELECT {col_list} FROM `{table}` LIMIT %s OFFSET %s',
+                    (BATCH_SIZE, offset),
+                )
+            else:  # POSTGRESQL
+                cur.execute(
+                    f'SELECT {col_list} FROM "{table}" LIMIT %s OFFSET %s',
+                    (BATCH_SIZE, offset),
+                )
             rows = cur.fetchall()
 
         if not rows:
@@ -246,10 +370,22 @@ def copy_table_in_batches(
 
         with dest_conn.cursor() as cur:
             for row in rows:
-                cur.execute(
-                    f'INSERT INTO "{table}" ({col_list}) VALUES ({placeholders})',
-                    row,
-                )
+                # Convert dict to tuple if using MySQL DictCursor
+                if isinstance(row, dict):
+                    row_values = tuple(row[c] for c in col_names)
+                else:
+                    row_values = row
+                
+                if dest_engine == "MYSQL":
+                    cur.execute(
+                        f'INSERT INTO `{table}` ({col_list}) VALUES ({placeholders})',
+                        row_values,
+                    )
+                else:  # POSTGRESQL
+                    cur.execute(
+                        f'INSERT INTO "{table}" ({col_list}) VALUES ({placeholders})',
+                        row_values,
+                    )
         dest_conn.commit()
 
         rows_copied += len(rows)
@@ -332,24 +468,22 @@ def run_migration() -> None:
 
     # 4. Connect to databases
     try:
-        src_conn = psycopg2.connect(get_connection_string(src_creds))
-        src_conn.autocommit = False
-        logger.info("Connected to source database: %s", src_creds["host"])
-    except psycopg2.Error as exc:
+        src_conn = get_db_connection(src_creds, SOURCE_DB_ENGINE)
+        logger.info("Connected to source database: %s (engine: %s)", src_creds["host"], SOURCE_DB_ENGINE)
+    except Exception as exc:
         logger.error("Failed to connect to source database: %s", exc)
         sys.exit(1)
 
     try:
-        dst_conn = psycopg2.connect(get_connection_string(dst_creds))
-        dst_conn.autocommit = False
-        logger.info("Connected to destination database: %s", dst_creds["host"])
-    except psycopg2.Error as exc:
+        dst_conn = get_db_connection(dst_creds, DEST_DB_ENGINE)
+        logger.info("Connected to destination database: %s (engine: %s)", dst_creds["host"], DEST_DB_ENGINE)
+    except Exception as exc:
         logger.error("Failed to connect to destination database: %s", exc)
         src_conn.close()
         sys.exit(1)
 
     # 5. Discover tables
-    tables = discover_tables(src_conn)
+    tables = discover_tables(src_conn, SOURCE_DB_ENGINE)
     logger.info("Found %d tables: %s", len(tables), ", ".join(tables))
 
     if not tables:
@@ -361,7 +495,7 @@ def run_migration() -> None:
     # 6. Calculate total rows
     total_rows = 0
     for table in tables:
-        total_rows += get_table_row_count(src_conn, table)
+        total_rows += get_table_row_count(src_conn, table, SOURCE_DB_ENGINE)
     logger.info("Total rows to migrate: %d", total_rows)
 
     # 7. Resume from checkpoint if available
@@ -374,14 +508,15 @@ def run_migration() -> None:
             logger.info("--- Processing table: %s ---", table)
 
             # Create table on destination if needed
-            create_table_if_not_exists(dst_conn, src_conn, table)
+            create_table_if_not_exists(dst_conn, src_conn, table, SOURCE_DB_ENGINE, DEST_DB_ENGINE)
 
             # Get row count for this table
-            table_rows = get_table_row_count(src_conn, table)
+            table_rows = get_table_row_count(src_conn, table, SOURCE_DB_ENGINE)
 
             # Copy data
             copied = copy_table_in_batches(
-                src_conn, dst_conn, table, migration_id, total_rows, rows_already_migrated
+                src_conn, dst_conn, table, migration_id, total_rows, rows_already_migrated,
+                SOURCE_DB_ENGINE, DEST_DB_ENGINE
             )
             rows_already_migrated += copied
 

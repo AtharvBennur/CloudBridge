@@ -59,18 +59,27 @@ const CHART_COLORS = {
 const PIE_COLORS = [CHART_COLORS.success, CHART_COLORS.primary, CHART_COLORS.warning, CHART_COLORS.destructive];
 
 function generateThroughputData(migrations: any[]) {
-  const last7Days = Array.from({ length: 7 }, (_, i) => {
+  const days = Array.from({ length: 7 }, (_, i) => {
     const d = new Date();
     d.setDate(d.getDate() - (6 - i));
-    return d.toLocaleDateString("en-US", { weekday: "short" });
+    return d;
   });
 
-  return last7Days.map((day) => ({
-    day,
-    completed: Math.floor(Math.random() * (migrations.length + 3)),
-    started: Math.floor(Math.random() * (migrations.length + 5)),
-    failed: Math.floor(Math.random() * 2),
-  }));
+  return days.map((date) => {
+    const dateStr = date.toISOString().split("T")[0];
+    const dayLabel = date.toLocaleDateString("en-US", { weekday: "short" });
+
+    const started = migrations.filter((m) => m.created_at && m.created_at.startsWith(dateStr)).length;
+    const completed = migrations.filter((m) => m.completed_at && m.completed_at.startsWith(dateStr) && m.status === "COMPLETED").length;
+    const failed = migrations.filter((m) => m.completed_at && m.completed_at.startsWith(dateStr) && m.status === "FAILED").length;
+
+    return {
+      day: dayLabel,
+      completed,
+      started,
+      failed,
+    };
+  });
 }
 
 export function DashboardPage() {
@@ -104,7 +113,7 @@ export function DashboardPage() {
           (systemMetrics.migrations.failed === 0 ? 20 : 0) +
           (apiStatus === "Healthy" ? 20 : 0),
       )
-    : 0;
+    : (totalMigrations > 0 ? Math.round((completedMigrations / totalMigrations) * 100) : 0);
 
   const throughputData = generateThroughputData(migrationsQuery.data || []);
 
@@ -208,16 +217,16 @@ export function DashboardPage() {
       {/* Stat Cards */}
       <motion.section variants={container} initial="hidden" animate="show" className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         <motion.div variants={item}>
-          <StatCard title="Total Migrations" value={totalMigrations} change={`${runningMigrations} active, ${completedMigrations} done`} icon={Database} trend="up" iconBg="bg-gradient-to-br from-blue-500 to-cyan-400" />
+          <StatCard title="Total Migrations" value={totalMigrations} change={totalMigrations > 0 ? `${runningMigrations} active, ${completedMigrations} done` : "No migrations"} icon={Database} trend={totalMigrations > 0 ? "up" : "neutral"} iconBg="bg-gradient-to-br from-blue-500 to-cyan-400" />
         </motion.div>
         <motion.div variants={item}>
-          <StatCard title="AWS Connections" value={totalAWSConns} change={`${activeAWSConns} accounts active`} icon={Cloud} trend="up" iconBg="bg-gradient-to-br from-indigo-500 to-blue-400" />
+          <StatCard title="AWS Connections" value={totalAWSConns} change={totalAWSConns > 0 ? `${activeAWSConns} accounts active` : "No connections"} icon={Cloud} trend={totalAWSConns > 0 ? "up" : "neutral"} iconBg="bg-gradient-to-br from-indigo-500 to-blue-400" />
         </motion.div>
         <motion.div variants={item}>
-          <StatCard title="Registered Databases" value={totalDatabases} change="Secrets stored in customer SM" icon={Server} trend="neutral" iconBg="bg-gradient-to-br from-violet-500 to-purple-400" />
+          <StatCard title="Registered Databases" value={totalDatabases} change={totalDatabases > 0 ? "Databases configured" : "No databases"} icon={Server} trend={totalDatabases > 0 ? "neutral" : "neutral"} iconBg="bg-gradient-to-br from-violet-500 to-purple-400" />
         </motion.div>
         <motion.div variants={item}>
-          <StatCard title="Failed Runs" value={failedMigrations} change={failedMigrations > 0 ? "Review failed workers" : "All clean"} icon={Activity} trend={failedMigrations > 0 ? "down" : "neutral"} iconBg="bg-gradient-to-br from-rose-500 to-pink-400" />
+          <StatCard title="Failed Runs" value={failedMigrations} change={failedMigrations > 0 ? "Review failed workers" : "No failures"} icon={Activity} trend={failedMigrations > 0 ? "down" : "neutral"} iconBg="bg-gradient-to-br from-rose-500 to-pink-400" />
         </motion.div>
       </motion.section>
 

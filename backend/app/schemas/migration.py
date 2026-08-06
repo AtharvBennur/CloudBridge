@@ -26,8 +26,8 @@ class CreateMigrationRequest:
     """Represents the payload required to create a new migration job."""
 
     job_name: str
-    source_database: str
-    destination_database: str
+    source_database: str | None = None
+    destination_database: str | None = None
     description: str | None = None
     aws_connection_id: int | None = None
     source_database_config_id: int | None = None
@@ -50,11 +50,20 @@ class CreateMigrationRequest:
         if not isinstance(job_name, str) or not job_name.strip():
             raise ValueError("Job name is required.")
 
-        if not isinstance(source_database, str) or not source_database.strip():
-            raise ValueError("Source database is required.")
+        # Require database config IDs OR database names for flexibility
+        if source_database_config_id is None or source_database_config_id == "":
+            if source_database is None or source_database == "":
+                raise ValueError("Either source_database_config_id or source_database is required.")
+        if destination_database_config_id is None or destination_database_config_id == "":
+            if destination_database is None or destination_database == "":
+                raise ValueError("Either destination_database_config_id or destination_database is required.")
 
-        if not isinstance(destination_database, str) or not destination_database.strip():
-            raise ValueError("Destination database is required.")
+        # Optional: allow database names for backward compatibility
+        if source_database is not None and (not isinstance(source_database, str) or not source_database.strip()):
+            raise ValueError("Source database must be a string if provided.")
+
+        if destination_database is not None and (not isinstance(destination_database, str) or not destination_database.strip()):
+            raise ValueError("Destination database must be a string if provided.")
 
         if description is not None and not isinstance(description, str):
             raise ValueError("Description must be a string.")
@@ -71,8 +80,8 @@ class CreateMigrationRequest:
 
         return cls(
             job_name=job_name.strip(),
-            source_database=source_database.strip(),
-            destination_database=destination_database.strip(),
+            source_database=source_database.strip() if isinstance(source_database, str) else None,
+            destination_database=destination_database.strip() if isinstance(destination_database, str) else None,
             description=description.strip() if isinstance(description, str) else None,
             aws_connection_id=aws_connection_id,
             source_database_config_id=source_database_config_id,

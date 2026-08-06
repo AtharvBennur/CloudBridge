@@ -4,7 +4,7 @@ import { env } from "@/lib/env";
 
 export const apiClient = axios.create({
   baseURL: env.apiBaseUrl,
-  timeout: 10_000,
+  timeout: 180_000,  // 3 minutes to accommodate slow AWS API calls
   headers: {
     "Content-Type": "application/json",
   },

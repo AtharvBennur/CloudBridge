@@ -358,18 +358,20 @@ export function DatabaseConfigPage() {
                   </div>
                 </div>
 
-                {formValues.purpose === "SOURCE" && (
-                  <div className="space-y-2">
-                    <Label htmlFor="database_name">Database Name</Label>
-                    <Input
-                      id="database_name"
-                      value={formValues.database_name}
-                      onChange={(e) => setFormValues({ ...formValues, database_name: e.target.value })}
-                      placeholder="e.g. production_db"
-                    />
-                    <p className="text-xs text-muted-foreground">The actual database name on the server (required for migration).</p>
-                  </div>
-                )}
+                <div className="space-y-2">
+                  <Label htmlFor="database_name">Database Name</Label>
+                  <Input
+                    id="database_name"
+                    value={formValues.database_name}
+                    onChange={(e) => setFormValues({ ...formValues, database_name: e.target.value })}
+                    placeholder={formValues.purpose === "SOURCE" ? "e.g. production_db" : "e.g. cloudbridge"}
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    {formValues.purpose === "SOURCE" 
+                      ? "The actual database name on the server (required for migration)."
+                      : "The target database name where data will be migrated to."}
+                  </p>
+                </div>
 
                 {validationError && (
                   <div className="rounded-lg border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive">

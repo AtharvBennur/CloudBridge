@@ -141,6 +141,39 @@ def retry_ecs_task(task_id: int):
         return jsonify({"error": {"message": str(exc)}}), 400
 
 
+@ecs_bp.post("/tasks/<int:task_id>/pause")
+@login_required
+def pause_ecs_task(task_id: int):
+    """Pause a running ECS task."""
+    try:
+        task = ecs_service.pause_task(task_id)
+        return jsonify(ECSTaskResponse.from_model(task).to_dict()), 200
+    except ECSServiceError as exc:
+        return jsonify({"error": {"message": str(exc)}}), 400
+
+
+@ecs_bp.post("/tasks/<int:task_id>/resume")
+@login_required
+def resume_ecs_task(task_id: int):
+    """Resume a paused ECS task."""
+    try:
+        task = ecs_service.resume_task(task_id)
+        return jsonify(ECSTaskResponse.from_model(task).to_dict()), 200
+    except ECSServiceError as exc:
+        return jsonify({"error": {"message": str(exc)}}), 400
+
+
+@ecs_bp.post("/tasks/<int:task_id>/cancel")
+@login_required
+def cancel_ecs_task(task_id: int):
+    """Cancel a running ECS task."""
+    try:
+        task = ecs_service.cancel_task(task_id)
+        return jsonify(ECSTaskResponse.from_model(task).to_dict()), 200
+    except ECSServiceError as exc:
+        return jsonify({"error": {"message": str(exc)}}), 400
+
+
 @ecs_bp.delete("/tasks/<int:task_id>")
 @login_required
 def delete_ecs_task(task_id: int):

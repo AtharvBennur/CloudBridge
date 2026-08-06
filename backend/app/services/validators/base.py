@@ -32,7 +32,7 @@ class BaseDatabaseValidator(ABC):
         username: str,
         password: str,
         database_name: str | None = None,
-        timeout: int = 15,
+        timeout: int = 300,  # 5 minutes for slow remote database connections
     ) -> None:
         self.host = host
         self.port = port
@@ -93,6 +93,11 @@ class BaseDatabaseValidator(ABC):
     @abstractmethod
     def get_table_row_count(self, table: str) -> int | None:
         """Return an approximate row count if inexpensive, else None."""
+        ...
+
+    @abstractmethod
+    def execute_verify_query(self) -> None:
+        """Execute a verification query to ensure connection is genuinely working."""
         ...
 
     # ── Shared helpers ───────────────────────────────────────────────────

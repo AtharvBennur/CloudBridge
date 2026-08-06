@@ -18,8 +18,8 @@ export function MigrationCreatePage() {
     mutationFn: (values: WizardValues) =>
       migrationService.create({
         job_name: values.job_name,
-        source_database: values.source_database,
-        destination_database: values.destination_database,
+        source_database_config_id: parseInt(values.source_database_config_id),
+        destination_database_config_id: parseInt(values.destination_database_config_id),
         description: values.description || undefined,
       }),
     onSuccess: async () => {

@@ -790,7 +790,7 @@ function ConnectionResultCard({ result }: { result: any }) {
           {data.details?.credentials_expires_at && (
             <div className="col-span-2">
               <p className="text-muted-foreground">Credentials Expire At</p>
-              <p className="font-mono">{String(data.details.credentials_expires_at)}</p>
+              <p className="font-mono">{new Date(data.details.credentials_expires_at).toLocaleString()}</p>
             </div>
           )}
         </div>

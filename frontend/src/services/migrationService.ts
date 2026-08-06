@@ -81,33 +81,61 @@ export const migrationService = {
     return response.data;
   },
 
-  async start(migrationId: number): Promise<any> {
-    const response = await apiClient.post<any>("/migration-engine/start", { migration_id: migrationId });
+  async start(migrationId: number, awsConnectionId?: number): Promise<any> {
+    const response = await apiClient.post<any>("/ecs/start-migration", { 
+      migration_id: migrationId,
+      aws_connection_id: awsConnectionId
+    });
     return response.data;
   },
 
   async pause(migrationId: number): Promise<any> {
-    const response = await apiClient.post<any>("/migration-engine/pause", { migration_id: migrationId });
-    return response.data;
+    // First get the ECS task for this migration, then pause it
+    const response = await apiClient.get<any>(`/ecs/tasks?migration_id=${migrationId}`);
+    const tasks = response.data;
+    if (tasks.length === 0) throw new Error("No ECS task found for this migration");
+    const taskId = tasks[0].id;
+    const pauseResponse = await apiClient.post<any>(`/ecs/tasks/${taskId}/pause`);
+    return pauseResponse.data;
   },
 
   async resume(migrationId: number): Promise<any> {
-    const response = await apiClient.post<any>("/migration-engine/resume", { migration_id: migrationId });
-    return response.data;
+    // First get the ECS task for this migration, then resume it
+    const response = await apiClient.get<any>(`/ecs/tasks?migration_id=${migrationId}`);
+    const tasks = response.data;
+    if (tasks.length === 0) throw new Error("No ECS task found for this migration");
+    const taskId = tasks[0].id;
+    const resumeResponse = await apiClient.post<any>(`/ecs/tasks/${taskId}/resume`);
+    return resumeResponse.data;
   },
 
   async cancel(migrationId: number): Promise<any> {
-    const response = await apiClient.post<any>("/migration-engine/cancel", { migration_id: migrationId });
-    return response.data;
+    // First get the ECS task for this migration, then cancel it
+    const response = await apiClient.get<any>(`/ecs/tasks?migration_id=${migrationId}`);
+    const tasks = response.data;
+    if (tasks.length === 0) throw new Error("No ECS task found for this migration");
+    const taskId = tasks[0].id;
+    const cancelResponse = await apiClient.post<any>(`/ecs/tasks/${taskId}/cancel`);
+    return cancelResponse.data;
   },
 
   async retry(migrationId: number): Promise<any> {
-    const response = await apiClient.post<any>("/migration-engine/retry", { migration_id: migrationId });
-    return response.data;
+    // First get the ECS task for this migration, then retry it
+    const response = await apiClient.get<any>(`/ecs/tasks?migration_id=${migrationId}`);
+    const tasks = response.data;
+    if (tasks.length === 0) throw new Error("No ECS task found for this migration");
+    const taskId = tasks[0].id;
+    const retryResponse = await apiClient.post<any>(`/ecs/tasks/${taskId}/retry`);
+    return retryResponse.data;
   },
 
   async getStatus(migrationId: number): Promise<any> {
-    const response = await apiClient.get<any>(`/migration-engine/${migrationId}/status`);
-    return response.data;
+    // Get ECS task status instead of migration-engine status
+    const response = await apiClient.get<any>(`/ecs/tasks?migration_id=${migrationId}`);
+    const tasks = response.data;
+    if (tasks.length === 0) throw new Error("No ECS task found for this migration");
+    const taskId = tasks[0].id;
+    const statusResponse = await apiClient.get<any>(`/ecs/tasks/${taskId}/status`);
+    return statusResponse.data;
   },
 };

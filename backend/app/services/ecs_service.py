@@ -171,6 +171,35 @@ class ECSService:
 
         return task
 
+    def pause_task(self, task_id: int) -> ECSTask:
+        """Pause a running ECS task (signals the worker to pause)."""
+        task = ECSTask.query.get(task_id)
+        if not task:
+            raise ECSTaskNotFoundError(f"ECS task {task_id} was not found.")
+
+        task.status = ECSTaskStatus.PAUSED
+        db.session.commit()
+        self._log_info("ECS task paused", task.id, task.task_arn)
+        return task
+
+    def resume_task(self, task_id: int) -> ECSTask:
+        """Resume a paused ECS task."""
+        task = ECSTask.query.get(task_id)
+        if not task:
+            raise ECSTaskNotFoundError(f"ECS task {task_id} was not found.")
+
+        if task.status != ECSTaskStatus.PAUSED:
+            raise ECSServiceError(f"Cannot resume task with status {task.status}")
+
+        task.status = ECSTaskStatus.RUNNING
+        db.session.commit()
+        self._log_info("ECS task resumed", task.id, task.task_arn)
+        return task
+
+    def cancel_task(self, task_id: int) -> ECSTask:
+        """Cancel a running ECS task."""
+        return self.stop_task(task_id, "Cancelled by CloudBridge")
+
     def get_task_status(self, task_id: int) -> dict[str, Any]:
         """Get the current status of an ECS task from AWS."""
         task = ECSTask.query.get(task_id)

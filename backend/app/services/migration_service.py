@@ -28,6 +28,7 @@ from app.exceptions.migration import (
     MigrationValidationError,
 )
 from app.extensions import db
+from app.models.database_config import DatabaseConfig
 from app.models.aws_connection import AWSConnection
 from app.models.database_config import DatabaseConfig
 from app.models.migration import MigrationJob, MigrationStatus
@@ -60,10 +61,24 @@ class MigrationService:
         )
 
         try:
+            # Get database configs to populate source/destination database names
+            source_db_name = None
+            dest_db_name = None
+            
+            if create_request.source_database_config_id:
+                source_config = DatabaseConfig.query.get(create_request.source_database_config_id)
+                if source_config:
+                    source_db_name = source_config.database_name or source_config.name
+            
+            if create_request.destination_database_config_id:
+                dest_config = DatabaseConfig.query.get(create_request.destination_database_config_id)
+                if dest_config:
+                    dest_db_name = dest_config.database_name or dest_config.name
+            
             migration_job = MigrationJob(
                 job_name=create_request.job_name,
-                source_database=create_request.source_database,
-                destination_database=create_request.destination_database,
+                source_database=create_request.source_database or source_db_name or "Unknown",
+                destination_database=create_request.destination_database or dest_db_name or "Unknown",
                 status=MigrationStatus.PENDING,
                 description=create_request.description,
                 aws_connection_id=create_request.aws_connection_id,

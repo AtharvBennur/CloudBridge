@@ -19,7 +19,7 @@ def get_validator(
     username: str,
     password: str,
     database_name: str | None = None,
-    timeout: int = 5,
+    timeout: int = 300,  # 5 minutes for slow remote database connections
 ) -> BaseDatabaseValidator:
     """Return an engine-specific validator instance.
 

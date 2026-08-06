@@ -129,14 +129,43 @@ class ECRManager:
         # Step 1: Ensure repository exists
         self.ensure_repository()
 
-        # Step 2: Get auth token and login Docker
+        # Step 1b: Check if image tag already exists in ECR to avoid unnecessary local builds
+        try:
+            images = self._ecr.describe_images(
+                repositoryName=REPO_NAME,
+                imageIds=[{"imageTag": image_tag}],
+            ).get("imageDetails", [])
+            if images:
+                digest = images[0].get("imageDigest", "existing")
+                logger.info("Found existing ECR image '%s' (digest: %s). Reusing existing image.", image_uri, digest)
+                return PushedImage(
+                    image_uri=image_uri,
+                    repository_uri=self._repository_uri,
+                    tag=image_tag,
+                    digest=digest,
+                )
+        except ClientError as exc:
+            logger.debug("Image tag '%s' not present in ECR, proceeding to docker build: %s", image_tag, exc)
+
+        # Step 2: Check if local docker daemon is running
+        try:
+            subprocess.run(["docker", "info"], capture_output=True, text=True, timeout=10, check=True)
+        except (subprocess.SubprocessError, FileNotFoundError, OSError) as exc:
+            raise ecr_push_error(
+                "Docker Desktop daemon is not running on your host machine. "
+                "Please start Docker Desktop on Windows or upload the 'cloudbridge-migration-worker:latest' image to AWS ECR.",
+                image_tag,
+                retryable=False,
+            ) from exc
+
+        # Step 3: Get auth token and login Docker
         username, password = self.get_authorization_token()
         self._docker_login(password)
 
-        # Step 3: Build the image
+        # Step 4: Build the image
         self._docker_build(worker_dir, image_uri)
 
-        # Step 4: Push the image
+        # Step 5: Push the image
         digest = self._docker_push(image_uri)
 
         logger.info("Successfully pushed image: %s", image_uri)

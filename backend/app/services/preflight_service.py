@@ -202,7 +202,8 @@ class PreflightService:
         # TCP reachability
         conn_ok = test_tcp_connectivity(config.host, config.port)
 
-        # Secret access
+        # Secret access - only check if the database has a secret stored
+        # (manually configured databases store credentials in CloudBridge DB, not Secrets Manager)
         secret_id = config.secret_arn or config.secret_name
         if credentials and secret_id:
             try:
@@ -211,6 +212,11 @@ class PreflightService:
             except Exception as exc:
                 secret_ok = False
                 msg = f"Secrets Manager error: {exc}"
+        elif not secret_id:
+            # No secret stored - this is a manually configured database
+            # Credentials are stored in CloudBridge's database config
+            secret_ok = True
+            logger.debug("Database %s has no secret ARN/name - treating as manually configured", label)
         else:
             secret_ok = bool(secret_id)
 

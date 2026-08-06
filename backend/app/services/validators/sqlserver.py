@@ -146,3 +146,15 @@ class SQLServerValidator(BaseDatabaseValidator):
         except Exception:
             pass
         return None
+
+    def execute_verify_query(self) -> None:
+        """Execute a verification query to ensure connection is genuinely working."""
+        logger.debug("Executing verification query: SELECT @@VERSION")
+        try:
+            with self._connection.cursor() as cur:
+                cur.execute("SELECT @@VERSION")
+                result = cur.fetchone()
+                logger.debug("✓ Verification query successful: SQL Server version %s", result)
+        except Exception as exc:
+            logger.error("✗ Verification query failed: %s", exc)
+            raise

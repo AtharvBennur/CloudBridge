@@ -11,7 +11,7 @@ from typing import Any
 
 
 @dataclass
-class MigrationError:
+class MigrationError(Exception):
     """Structured error returned by migration operations."""
 
     stage: str  # e.g., "ecr_push", "task_definition", "run_task", "resource_discovery"
@@ -21,6 +21,10 @@ class MigrationError:
     message: str  # Human-readable message
     retryable: bool = False
     details: dict[str, Any] = field(default_factory=dict)
+
+    def __post_init__(self):
+        """Initialize the Exception with the message."""
+        super().__init__(self.message)
 
     def to_dict(self) -> dict[str, Any]:
         return {

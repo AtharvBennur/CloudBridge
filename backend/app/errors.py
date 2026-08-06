@@ -85,10 +85,19 @@ def register_error_handlers(app: Flask) -> None:
     def handle_unexpected_exception(error: Exception):
         tb = traceback.format_exc()
         app.logger.error("Unhandled application error: %s\n%s", error, tb)
+        
+        # Extract specific error detail
+        error_name = type(error).__name__
+        error_msg = str(error) or "An internal error occurred."
+        
         response = {
             "error": {
-                "code": HTTPStatus.INTERNAL_SERVER_ERROR.name,
-                "message": "An unexpected error occurred.",
+                "code": error_name,
+                "message": error_msg,
+                "problem": f"Backend encountered an unhandled exception: {error_name}",
+                "cause": error_msg,
+                "suggested_fix": "Inspect the backend logs for the full stack trace or check resource permissions.",
+                "traceback": tb,
                 "status": HTTPStatus.INTERNAL_SERVER_ERROR,
             }
         }

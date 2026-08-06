@@ -23,8 +23,8 @@ import { awsConnectionService } from "@/services/awsConnectionService";
 
 export interface WizardValues {
   job_name: string;
-  source_database: string;
-  destination_database: string;
+  source_database_config_id: string;
+  destination_database_config_id: string;
   description: string;
   chunk_size: string;
   max_retries: string;
@@ -46,8 +46,8 @@ export function MigrationWizard({ onSubmit, isSubmitting }: MigrationWizardProps
   const [currentStep, setCurrentStep] = useState(0);
   const [values, setValues] = useState<WizardValues>({
     job_name: "",
-    source_database: "",
-    destination_database: "",
+    source_database_config_id: "",
+    destination_database_config_id: "",
     description: "",
     chunk_size: "1000",
     max_retries: "3",
@@ -72,7 +72,7 @@ export function MigrationWizard({ onSubmit, isSubmitting }: MigrationWizardProps
       case 0:
         return values.job_name.trim().length > 0;
       case 1:
-        return values.source_database.trim().length > 0 && values.destination_database.trim().length > 0;
+        return values.source_database_config_id.trim().length > 0 && values.destination_database_config_id.trim().length > 0;
       case 2:
         return true;
       case 3:
@@ -178,12 +178,12 @@ export function MigrationWizard({ onSubmit, isSubmitting }: MigrationWizardProps
                     <Label>Source Database</Label>
                     <select
                       className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm"
-                      value={values.source_database}
-                      onChange={(e) => updateField("source_database", e.target.value)}
+                      value={values.source_database_config_id}
+                      onChange={(e) => updateField("source_database_config_id", e.target.value)}
                     >
                       <option value="">-- Select source database --</option>
                       {sourceDbs.map((db) => (
-                        <option key={db.id} value={db.name}>
+                        <option key={db.id} value={db.id}>
                           {db.name} ({db.database_type} - {db.host})
                         </option>
                       ))}
@@ -196,12 +196,12 @@ export function MigrationWizard({ onSubmit, isSubmitting }: MigrationWizardProps
                     <Label>Destination Database</Label>
                     <select
                       className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm"
-                      value={values.destination_database}
-                      onChange={(e) => updateField("destination_database", e.target.value)}
+                      value={values.destination_database_config_id}
+                      onChange={(e) => updateField("destination_database_config_id", e.target.value)}
                     >
                       <option value="">-- Select destination database --</option>
                       {destDbs.map((db) => (
-                        <option key={db.id} value={db.name}>
+                        <option key={db.id} value={db.id}>
                           {db.name} ({db.database_type} - {db.host})
                         </option>
                       ))}
@@ -259,8 +259,8 @@ export function MigrationWizard({ onSubmit, isSubmitting }: MigrationWizardProps
                   <div className="grid gap-3 md:grid-cols-2">
                     <ReviewField label="Job Name" value={values.job_name} />
                     <ReviewField label="Description" value={values.description || "—"} />
-                    <ReviewField label="Source Database" value={values.source_database} />
-                    <ReviewField label="Destination Database" value={values.destination_database} />
+                    <ReviewField label="Source Database" value={sourceDbs.find(d => d.id === parseInt(values.source_database_config_id))?.name || values.source_database_config_id} />
+                    <ReviewField label="Destination Database" value={destDbs.find(d => d.id === parseInt(values.destination_database_config_id))?.name || values.destination_database_config_id} />
                     <ReviewField label="Chunk Size" value={`${values.chunk_size} rows/batch`} />
                     <ReviewField label="Max Retries" value={values.max_retries} />
                   </div>

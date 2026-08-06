@@ -13,14 +13,15 @@ Migration Detail Page
 Migration Service
 */
 
-import { useQuery } from "@tanstack/react-query";
-import { ArrowLeft, Database, CalendarDays, FolderKanban } from "lucide-react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { ArrowLeft, Database, CalendarDays, FolderKanban, Play, Pause, RotateCcw, X } from "lucide-react";
 import { useNavigate, useParams } from "react-router-dom";
 
 import { StatusBadge } from "@/components/migrations/StatusBadge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { migrationService } from "@/services/migrationService";
+import { useToast } from "@/components/ui/toast";
 
 function formatDate(value: string) {
   return new Date(value).toLocaleString();
@@ -30,11 +31,68 @@ export function MigrationDetailPage() {
   const navigate = useNavigate();
   const { id } = useParams();
   const migrationId = Number(id);
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
 
   const migrationQuery = useQuery({
     queryKey: ["migration", migrationId],
     queryFn: () => migrationService.getById(migrationId),
     enabled: Number.isFinite(migrationId),
+  });
+
+  const startMutation = useMutation({
+    mutationFn: () => migrationService.start(migrationId, migrationQuery.data?.aws_connection_id ?? undefined),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["migration", migrationId] });
+      toast({ title: "Migration started", description: "Migration is now running on ECS", variant: "success" });
+    },
+    onError: (error: any) => {
+      toast({ title: "Failed to start migration", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const pauseMutation = useMutation({
+    mutationFn: () => migrationService.pause(migrationId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["migration", migrationId] });
+      toast({ title: "Migration paused", description: "Migration has been paused", variant: "success" });
+    },
+    onError: (error: any) => {
+      toast({ title: "Failed to pause migration", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const resumeMutation = useMutation({
+    mutationFn: () => migrationService.resume(migrationId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["migration", migrationId] });
+      toast({ title: "Migration resumed", description: "Migration has been resumed", variant: "success" });
+    },
+    onError: (error: any) => {
+      toast({ title: "Failed to resume migration", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const cancelMutation = useMutation({
+    mutationFn: () => migrationService.cancel(migrationId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["migration", migrationId] });
+      toast({ title: "Migration cancelled", description: "Migration has been cancelled", variant: "success" });
+    },
+    onError: (error: any) => {
+      toast({ title: "Failed to cancel migration", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const retryMutation = useMutation({
+    mutationFn: () => migrationService.retry(migrationId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["migration", migrationId] });
+      toast({ title: "Migration retry initiated", description: "Migration will be retried", variant: "success" });
+    },
+    onError: (error: any) => {
+      toast({ title: "Failed to retry migration", description: error.message, variant: "destructive" });
+    },
   });
 
   if (migrationQuery.isLoading) {
@@ -69,7 +127,64 @@ export function MigrationDetailPage() {
           <h1 className="text-3xl font-semibold">{migration.job_name}</h1>
           <p className="mt-2 text-sm text-muted-foreground">Inspection view for a single migration job.</p>
         </div>
-        <StatusBadge status={migration.status} />
+        <div className="flex items-center gap-3">
+          <StatusBadge status={migration.status} />
+          <div className="flex gap-2">
+            {migration.status === "PENDING" && (
+              <Button 
+                size="sm" 
+                onClick={() => startMutation.mutate()}
+                disabled={startMutation.isPending}
+              >
+                <Play className="h-4 w-4 mr-2" />
+                Start
+              </Button>
+            )}
+            {migration.status === "RUNNING" && (
+              <>
+                <Button 
+                  size="sm" 
+                  variant="outline"
+                  onClick={() => pauseMutation.mutate()}
+                  disabled={pauseMutation.isPending}
+                >
+                  <Pause className="h-4 w-4 mr-2" />
+                  Pause
+                </Button>
+                <Button 
+                  size="sm" 
+                  variant="destructive"
+                  onClick={() => cancelMutation.mutate()}
+                  disabled={cancelMutation.isPending}
+                >
+                  <X className="h-4 w-4 mr-2" />
+                  Cancel
+                </Button>
+              </>
+            )}
+            {migration.status === "PAUSED" && (
+              <Button 
+                size="sm" 
+                onClick={() => resumeMutation.mutate()}
+                disabled={resumeMutation.isPending}
+              >
+                <Play className="h-4 w-4 mr-2" />
+                Resume
+              </Button>
+            )}
+            {migration.status === "FAILED" && (
+              <Button 
+                size="sm" 
+                variant="outline"
+                onClick={() => retryMutation.mutate()}
+                disabled={retryMutation.isPending}
+              >
+                <RotateCcw className="h-4 w-4 mr-2" />
+                Retry
+              </Button>
+            )}
+          </div>
+        </div>
       </div>
 
       <div className="grid gap-4 lg:grid-cols-[1.2fr_0.8fr]">
