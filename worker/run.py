@@ -127,40 +127,36 @@ def resolve_secret_credentials(secret_arn: str, region: str) -> dict[str, str]:
 
 def get_source_credentials() -> dict[str, Any]:
     """Build source database connection parameters."""
-    if SOURCE_DB_SECRET_ARN:
+    # Try to get password from environment variables first (set by ECS)
+    password = SOURCE_DB_PASSWORD
+    if not password and SOURCE_DB_SECRET_ARN:
+        # Fall back to Secrets Manager
         secret = resolve_secret_credentials(SOURCE_DB_SECRET_ARN, AWS_REGION)
-        return {
-            "host": SOURCE_DB_HOST,
-            "port": SOURCE_DB_PORT,
-            "username": secret.get("username", SOURCE_DB_USERNAME),
-            "password": secret.get("password", ""),
-            "database": secret.get("dbname", SOURCE_DB_NAME),
-        }
+        password = secret.get("password", "")
+    
     return {
         "host": SOURCE_DB_HOST,
         "port": SOURCE_DB_PORT,
         "username": SOURCE_DB_USERNAME,
-        "password": SOURCE_DB_PASSWORD,
+        "password": password,
         "database": SOURCE_DB_NAME,
     }
 
 
 def get_destination_credentials() -> dict[str, Any]:
     """Build destination database connection parameters."""
-    if DEST_DB_SECRET_ARN:
+    # Try to get password from environment variables first (set by ECS)
+    password = DEST_DB_PASSWORD
+    if not password and DEST_DB_SECRET_ARN:
+        # Fall back to Secrets Manager
         secret = resolve_secret_credentials(DEST_DB_SECRET_ARN, AWS_REGION)
-        return {
-            "host": DEST_DB_HOST,
-            "port": DEST_DB_PORT,
-            "username": secret.get("username", DEST_DB_USERNAME),
-            "password": secret.get("password", ""),
-            "database": secret.get("dbname", DEST_DB_NAME),
-        }
+        password = secret.get("password", "")
+    
     return {
         "host": DEST_DB_HOST,
         "port": DEST_DB_PORT,
         "username": DEST_DB_USERNAME,
-        "password": DEST_DB_PASSWORD,
+        "password": password,
         "database": DEST_DB_NAME,
     }
 

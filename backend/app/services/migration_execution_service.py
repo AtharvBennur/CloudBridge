@@ -398,11 +398,13 @@ class MigrationExecutionService:
         if migration.source_database_config_id:
             src = db.session.get(DatabaseConfig, migration.source_database_config_id)
             if src:
+                # Use password if available, otherwise rely on secret_arn
+                password_value = getattr(src, 'password', None) or ""
                 env_vars.extend([
                     {"name": "SOURCE_DB_HOST", "value": src.host},
                     {"name": "SOURCE_DB_PORT", "value": str(src.port)},
                     {"name": "SOURCE_DB_USERNAME", "value": src.username},
-                    {"name": "SOURCE_DB_PASSWORD", "value": src.password or ""},
+                    {"name": "SOURCE_DB_PASSWORD", "value": password_value},
                     {"name": "SOURCE_DB_NAME", "value": src.database_name or src.name},
                     {"name": "SOURCE_DB_ENGINE", "value": src.database_type or "POSTGRESQL"},
                 ])
@@ -412,11 +414,13 @@ class MigrationExecutionService:
         if migration.destination_database_config_id:
             dst = db.session.get(DatabaseConfig, migration.destination_database_config_id)
             if dst:
+                # Use password if available, otherwise rely on secret_arn
+                password_value = getattr(dst, 'password', None) or ""
                 env_vars.extend([
                     {"name": "DEST_DB_HOST", "value": dst.host},
                     {"name": "DEST_DB_PORT", "value": str(dst.port)},
                     {"name": "DEST_DB_USERNAME", "value": dst.username},
-                    {"name": "DEST_DB_PASSWORD", "value": dst.password or ""},
+                    {"name": "DEST_DB_PASSWORD", "value": password_value},
                     {"name": "DEST_DB_NAME", "value": dst.database_name or dst.name},
                     {"name": "DEST_DB_ENGINE", "value": dst.database_type or "POSTGRESQL"},
                 ])
