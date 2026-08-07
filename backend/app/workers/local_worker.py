@@ -27,13 +27,6 @@ try:
 except ImportError:
     MYSQL_AVAILABLE = False
 
-try:
-    import pymysql
-    import pymysql.cursors
-    MYSQL_AVAILABLE = True
-except ImportError:
-    MYSQL_AVAILABLE = False
-
 from flask import Flask
 
 from app.extensions import db
@@ -248,7 +241,9 @@ class LocalMigrationWorker(threading.Thread, BaseMigrationWorker):
                 user=config.username,
                 password=config.password,
                 database=config.database_name,
-                connect_timeout=10,
+                connect_timeout=300,
+                read_timeout=300,
+                write_timeout=300,
                 cursorclass=pymysql.cursors.DictCursor,
                 charset='utf8mb4',
             )
@@ -258,7 +253,7 @@ class LocalMigrationWorker(threading.Thread, BaseMigrationWorker):
             conn_str = (
                 f"host={config.host} port={config.port} "
                 f"dbname={config.database_name} user={config.username} "
-                f"password={config.password} sslmode=require connect_timeout=10"
+                f"password={config.password} sslmode=prefer connect_timeout=300"
             )
             conn = psycopg2.connect(conn_str)
             conn.autocommit = False

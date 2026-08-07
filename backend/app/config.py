@@ -44,6 +44,9 @@ class BaseConfig:
         ).split(",")
         if origin.strip()
     ]
+    # Ensure CORS_ORIGINS is always a list
+    if isinstance(CORS_ORIGINS, str):
+        CORS_ORIGINS = [origin.strip() for origin in CORS_ORIGINS.split(",") if origin.strip()]
     LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO")
     
     # API Configuration
@@ -71,6 +74,9 @@ class BaseConfig:
     # Secrets Manager Configuration
     SECRETS_PREFIX = os.getenv("SECRETS_PREFIX", "cloudbridge/")
     SECRETS_CACHE_TTL = _get_int("SECRETS_CACHE_TTL", 300)
+
+    # Worker API Configuration (shared secret for internal ECS worker ↔ backend communication)
+    WORKER_API_SECRET = os.getenv("WORKER_API_SECRET", os.getenv("SECRET_KEY", ""))
 
     # SMTP Configuration
     SMTP_HOST = os.getenv("SMTP_HOST", "smtp.gmail.com")

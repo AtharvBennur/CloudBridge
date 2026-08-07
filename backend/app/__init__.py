@@ -30,6 +30,7 @@ from app.routes.observability import observability_bp
 from app.routes.notification import notification_bp
 from app.routes.rollback import rollback_bp
 from app.routes.websocket import handle_connect, handle_disconnect, handle_join_migration, handle_leave_migration, handle_join_ecs_task, handle_leave_ecs_task, handle_ping
+from app.routes.worker import worker_bp
 
 
 def create_app(config_name: str | None = None) -> Flask:
@@ -52,7 +53,11 @@ def create_app(config_name: str | None = None) -> Flask:
 
 def register_extensions(app: Flask) -> None:
     db.init_app(app)
-    cors.init_app(app, resources={r"/*": {"origins": app.config["CORS_ORIGINS"]}})
+    # Ensure CORS origins is a list
+    cors_origins = app.config.get("CORS_ORIGINS", "*")
+    if isinstance(cors_origins, str):
+        cors_origins = [origin.strip() for origin in cors_origins.split(",")]
+    cors.init_app(app, resources={r"/*": {"origins": cors_origins}})
 
 
 def register_middleware(app: Flask) -> None:
@@ -74,11 +79,15 @@ def register_blueprints(app: Flask) -> None:
     app.register_blueprint(observability_bp)
     app.register_blueprint(notification_bp)
     app.register_blueprint(rollback_bp)
+    app.register_blueprint(worker_bp)
 
 
 def register_websocket_handlers(app: Flask) -> None:
     """Register WebSocket event handlers."""
     cors_origins = app.config.get("CORS_ORIGINS", "*")
+    # Ensure CORS origins is a list for socketio
+    if isinstance(cors_origins, str):
+        cors_origins = [origin.strip() for origin in cors_origins.split(",")]
     socketio.init_app(app, cors_allowed_origins=cors_origins, async_mode="threading")
 
     socketio.on("connect")(handle_connect)

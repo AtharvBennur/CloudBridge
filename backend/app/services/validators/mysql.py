@@ -52,6 +52,7 @@ class MySQLValidator(BaseDatabaseValidator):
             "MySQL connection attempt: host=%s port=%s user=%s database=%s timeout=%ss",
             self.host, self.port, self.username, self.database_name or "(none)", self.timeout
         )
+        logger.info(f"Using timeout of {self.timeout} seconds for MySQL connection")
         
         try:
             # Set socket timeout explicitly for Windows compatibility

@@ -28,7 +28,6 @@ from app.services.validators import get_validator
 from app.services.validators.sensitive_masker import mask_row, should_mask_column
 
 logger = logging.getLogger(__name__)
-import time
 
 
 class DatabaseValidationError(ValueError):
@@ -107,7 +106,7 @@ class DatabaseValidationService:
         )
 
         # Step 1: Connect to database (TCP + handshake + auth all in one)
-        validator = get_validator(engine, host, port, username, password, database_name)
+        validator = get_validator(engine, host, port, username, password, database_name, timeout=300)
         try:
             logger.debug("Step 1: Connecting to database...")
             validator.connect()
@@ -310,9 +309,6 @@ class DatabaseValidationService:
                 ))
 
             logger.info("✓ SOURCE validation completed successfully")
-            # Keep the DB connection alive longer so AWS RDS metrics register the session.
-            logger.info("Keeping connection alive for 10 seconds to ensure RDS registers the session...")
-            time.sleep(10)
             return SourceValidationResponse(
                 connection="success",
                 database=database_name or "",
@@ -351,7 +347,7 @@ class DatabaseValidationService:
         logger.info("Starting DESTINATION validation for %s:%s/%s", host, port, database_name or "(none)")
 
         # Step 1: Connect to database (TCP + handshake + auth all in one)
-        validator = get_validator(engine, host, port, username, password, database_name)
+        validator = get_validator(engine, host, port, username, password, database_name, timeout=300)
         try:
             logger.debug("Step 1: Connecting to database...")
             validator.connect()
@@ -521,9 +517,6 @@ class DatabaseValidationService:
                 )
 
             logger.info("✓ DESTINATION validation completed successfully")
-            # Keep the DB connection alive longer so AWS RDS metrics register the session.
-            logger.info("Keeping connection alive for 10 seconds to ensure RDS registers the session...")
-            time.sleep(10)
             return DestinationValidationResponse(
                 connection="success",
                 database_exists=db_exists,

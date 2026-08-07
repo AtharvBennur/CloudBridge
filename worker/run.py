@@ -71,6 +71,13 @@ logger = logging.getLogger("migration-worker")
 API_URL = CLOUDBRIDGE_API_URL.rstrip("/")
 AWS_REGION = os.environ.get("AWS_DEFAULT_REGION", "us-east-1")
 
+# Shared secret for internal worker API calls
+WORKER_API_SECRET = os.environ.get("WORKER_API_SECRET", "")
+if not WORKER_API_SECRET:
+    # Fall back to SECRET_KEY if WORKER_API_SECRET is not set
+    WORKER_API_SECRET = os.environ.get("SECRET_KEY", "cloudbridge-worker-secret")
+    logger.warning("WORKER_API_SECRET not set, falling back to SECRET_KEY")
+
 # Source DB credentials (passed as env vars by ECS task)
 SOURCE_DB_HOST = os.environ.get("SOURCE_DB_HOST", "")
 SOURCE_DB_PORT = int(os.environ.get("SOURCE_DB_PORT", "5432"))
@@ -97,14 +104,22 @@ PROGRESS_REPORT_INTERVAL = int(os.environ.get("PROGRESS_REPORT_INTERVAL", "5000"
 # ---------------------------------------------------------------------------
 
 
+def _worker_headers() -> dict[str, str]:
+    """Build headers for internal worker API calls."""
+    return {
+        "Content-Type": "application/json",
+        "X-Worker-Secret": WORKER_API_SECRET,
+    }
+
+
 def api_get(path: str) -> dict[str, Any]:
-    resp = requests.get(f"{API_URL}{path}", timeout=30)
+    resp = requests.get(f"{API_URL}{path}", headers=_worker_headers(), timeout=60)
     resp.raise_for_status()
     return resp.json()
 
 
 def api_post(path: str, payload: dict[str, Any]) -> dict[str, Any]:
-    resp = requests.post(f"{API_URL}{path}", json=payload, timeout=30)
+    resp = requests.post(f"{API_URL}{path}", json=payload, headers=_worker_headers(), timeout=60)
     resp.raise_for_status()
     return resp.json()
 
@@ -117,7 +132,23 @@ def api_post(path: str, payload: dict[str, Any]) -> dict[str, Any]:
 def resolve_secret_credentials(secret_arn: str, region: str) -> dict[str, str]:
     """Retrieve database credentials from AWS Secrets Manager."""
     logger.info("Retrieving credentials from Secrets Manager: %s", secret_arn)
-    sm_client = boto3.client("secretsmanager", region_name=region)
+    
+    # Try to use AWS credentials from environment if available
+    aws_access_key_id = os.environ.get("AWS_ACCESS_KEY_ID")
+    aws_secret_access_key = os.environ.get("AWS_SECRET_ACCESS_KEY")
+    
+    if aws_access_key_id and aws_secret_access_key:
+        logger.info("Using AWS credentials from environment variables")
+        sm_client = boto3.client(
+            "secretsmanager", 
+            region_name=region,
+            aws_access_key_id=aws_access_key_id,
+            aws_secret_access_key=aws_secret_access_key
+        )
+    else:
+        logger.info("Using default AWS credentials chain (IAM role)")
+        sm_client = boto3.client("secretsmanager", region_name=region)
+    
     try:
         response = sm_client.get_secret_value(SecretId=secret_arn)
         return json.loads(response.get("SecretString", "{}"))
@@ -131,8 +162,12 @@ def get_source_credentials() -> dict[str, Any]:
     password = SOURCE_DB_PASSWORD
     if not password and SOURCE_DB_SECRET_ARN:
         # Fall back to Secrets Manager
+        logger.info(f"Password not provided in env, fetching from Secrets Manager: {SOURCE_DB_SECRET_ARN}")
         secret = resolve_secret_credentials(SOURCE_DB_SECRET_ARN, AWS_REGION)
         password = secret.get("password", "")
+    
+    if not password:
+        raise RuntimeError("Source database password not available - neither in env nor in Secrets Manager")
     
     return {
         "host": SOURCE_DB_HOST,
@@ -149,8 +184,12 @@ def get_destination_credentials() -> dict[str, Any]:
     password = DEST_DB_PASSWORD
     if not password and DEST_DB_SECRET_ARN:
         # Fall back to Secrets Manager
+        logger.info(f"Password not provided in env, fetching from Secrets Manager: {DEST_DB_SECRET_ARN}")
         secret = resolve_secret_credentials(DEST_DB_SECRET_ARN, AWS_REGION)
         password = secret.get("password", "")
+    
+    if not password:
+        raise RuntimeError("Destination database password not available - neither in env nor in Secrets Manager")
     
     return {
         "host": DEST_DB_HOST,
@@ -172,13 +211,13 @@ def get_connection_string(creds: dict[str, Any], engine: str = "POSTGRESQL") -> 
         return (
             f"host={creds['host']} port={creds['port']} "
             f"dbname={creds['database']} user={creds['username']} "
-            f"password={creds['password']} connect_timeout=10"
+            f"password={creds['password']} connect_timeout=300"
         )
     else:  # POSTGRESQL (default)
         return (
             f"host={creds['host']} port={creds['port']} "
             f"dbname={creds['database']} user={creds['username']} "
-            f"password={creds['password']} sslmode=require connect_timeout=10"
+            f"password={creds['password']} sslmode=prefer connect_timeout=300"
         )
 
 
@@ -194,7 +233,9 @@ def get_db_connection(creds: dict[str, Any], engine: str = "POSTGRESQL"):
             user=creds['username'],
             password=creds['password'],
             database=creds['database'],
-            connect_timeout=10,
+            connect_timeout=300,
+            read_timeout=300,
+            write_timeout=300,
             cursorclass=pymysql.cursors.DictCursor,
             charset='utf8mb4',
         )
@@ -405,9 +446,8 @@ def copy_table_in_batches(
         # Update CloudBridge with progress
         try:
             api_post(
-                "/migration-engine/checkpoint",
+                f"/worker/migrations/{migration_id}/checkpoint",
                 {
-                    "migration_id": migration_id,
                     "checkpoint_name": f"batch_{table}_{total_copied}",
                     "progress_percent": round(progress, 2),
                     "rows_processed": total_copied,
@@ -436,15 +476,18 @@ def run_migration() -> None:
     migration_id = int(MIGRATION_ID)
     logger.info("Starting migration %d", migration_id)
 
-    # 1. Fetch migration details
+    # 1. Fetch migration details from internal worker API
     try:
-        migration = api_get(f"/migrations/{migration_id}")
+        migration = api_get(f"/worker/migrations/{migration_id}")
     except requests.RequestException as exc:
         logger.error("Failed to fetch migration: %s", exc)
-        api_post(
-            "/migration-engine/status-update",
-            {"migration_id": migration_id, "status": "FAILED", "error": str(exc)},
-        )
+        try:
+            api_post(
+                f"/worker/migrations/{migration_id}/status",
+                {"status": "FAILED", "error": str(exc)},
+            )
+        except Exception:
+            pass
         sys.exit(1)
 
     logger.info("Migration: %s (%s -> %s)", migration["job_name"], migration["source_database"], migration["destination_database"])
@@ -529,9 +572,8 @@ def run_migration() -> None:
         # 9. Mark migration as completed
         logger.info("Migration %d completed successfully (%d total rows)", migration_id, rows_already_migrated)
         api_post(
-            "/migration-engine/status-update",
+            f"/worker/migrations/{migration_id}/status",
             {
-                "migration_id": migration_id,
                 "status": "COMPLETED",
                 "progress_percent": 100.0,
                 "rows_migrated": rows_already_migrated,
@@ -542,9 +584,8 @@ def run_migration() -> None:
         logger.error("Migration %d failed: %s", migration_id, exc)
         try:
             api_post(
-                "/migration-engine/status-update",
+                f"/worker/migrations/{migration_id}/status",
                 {
-                    "migration_id": migration_id,
                     "status": "FAILED",
                     "error": str(exc),
                     "progress_percent": overall_progress,

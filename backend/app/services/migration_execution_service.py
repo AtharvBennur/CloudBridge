@@ -388,11 +388,23 @@ class MigrationExecutionService:
             api_protocol = current_app.config.get("API_PROTOCOL", "http")
             api_base_url = f"{api_protocol}://{api_host}:{api_port}"
         
+        # Force use of Render backend URL for ECS workers
+        if "onrender.com" not in api_base_url:
+            logger.warning(f"API_BASE_URL '{api_base_url}' is not Render URL, updating to Render URL")
+            api_base_url = "https://cloudbridge-2-a0fp.onrender.com"
+        
+        logger.info(f"Final API URL for worker: {api_base_url}")
+        
         env_vars = [
             {"name": "CLOUDBRIDGE_API_URL", "value": api_base_url},
             {"name": "MIGRATION_ID", "value": str(migration.id)},
             {"name": "AWS_CONNECTION_ID", "value": str(aws_connection.id)},
             {"name": "AWS_DEFAULT_REGION", "value": aws_connection.aws_region},
+            {"name": "AWS_ACCESS_KEY_ID", "value": current_app.config.get("AWS_ACCESS_KEY_ID", "")},
+            {"name": "AWS_SECRET_ACCESS_KEY", "value": current_app.config.get("AWS_SECRET_ACCESS_KEY", "")},
+            # Worker auth: shared secret so the ECS task can call /worker/* internal API
+            {"name": "WORKER_API_SECRET", "value": current_app.config.get("WORKER_API_SECRET", "") or current_app.config.get("SECRET_KEY", "")},
+            {"name": "SECRET_KEY", "value": current_app.config.get("SECRET_KEY", "")},
         ]
 
         if migration.source_database_config_id:
@@ -400,6 +412,9 @@ class MigrationExecutionService:
             if src:
                 # Use password if available, otherwise rely on secret_arn
                 password_value = getattr(src, 'password', None) or ""
+                if not password_value and src.secret_arn:
+                    # If no password stored, we'll rely on secret_arn in the worker
+                    password_value = ""
                 env_vars.extend([
                     {"name": "SOURCE_DB_HOST", "value": src.host},
                     {"name": "SOURCE_DB_PORT", "value": str(src.port)},
@@ -416,6 +431,9 @@ class MigrationExecutionService:
             if dst:
                 # Use password if available, otherwise rely on secret_arn
                 password_value = getattr(dst, 'password', None) or ""
+                if not password_value and dst.secret_arn:
+                    # If no password stored, we'll rely on secret_arn in the worker
+                    password_value = ""
                 env_vars.extend([
                     {"name": "DEST_DB_HOST", "value": dst.host},
                     {"name": "DEST_DB_PORT", "value": str(dst.port)},
