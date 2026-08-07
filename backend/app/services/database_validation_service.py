@@ -16,6 +16,8 @@ Production-grade implementation with:
 from __future__ import annotations
 
 import logging
+import threading
+import time
 import traceback
 from typing import Any
 
@@ -308,6 +310,14 @@ class DatabaseValidationService:
                     detail=f"Previewed table '{selected_table}'",
                 ))
 
+            # Start a background thread to keep the connection alive so the user can see it on AWS
+            threading.Thread(
+                target=_keep_connection_alive,
+                args=(engine, host, port, username, password, database_name),
+                daemon=True,
+                name=f"KeepAlive-{host}"
+            ).start()
+
             logger.info("✓ SOURCE validation completed successfully")
             return SourceValidationResponse(
                 connection="success",
@@ -516,6 +526,14 @@ class DatabaseValidationService:
                     checks=checks,
                 )
 
+            # Start a background thread to keep the connection alive so the user can see it on AWS
+            threading.Thread(
+                target=_keep_connection_alive,
+                args=(engine, host, port, username, password, database_name),
+                daemon=True,
+                name=f"KeepAlive-{host}"
+            ).start()
+
             logger.info("✓ DESTINATION validation completed successfully")
             return DestinationValidationResponse(
                 connection="success",
@@ -563,3 +581,39 @@ def _format_validation_error(exc: Exception, host: str, port: int, username: str
             f"Suggested Fix: Check database server logs, network firewall settings, and account permissions."
         )
 
+
+def _keep_connection_alive(
+    engine: str,
+    host: str,
+    port: int,
+    username: str,
+    password: str,
+    database_name: str | None
+) -> None:
+    """Run a background loop to keep a database connection active for 10 minutes.
+    
+    This satisfies the requirement to have an active connection visible
+    on the AWS RDS console without blocking the HTTP validation response.
+    """
+    logger.info("Starting background keep-alive for DB: %s", database_name)
+    try:
+        from app.services.validators import get_validator
+        validator = get_validator(engine, host, port, username, password, database_name, timeout=600)
+        validator.connect()
+        
+        start_time = time.time()
+        # Keep alive for 10 minutes (600 seconds)
+        while time.time() - start_time < 600:
+            validator.execute_verify_query()
+            time.sleep(15)  # Ping every 15 seconds
+    except Exception as exc:
+        logger.debug("Keep-alive ended for %s: %s", database_name, exc)
+    finally:
+        try:
+            validator.disconnect()
+        except Exception:
+            try:
+                validator.close()
+            except Exception:
+                pass
+        logger.info("Keep-alive finished and disconnected for %s", database_name)

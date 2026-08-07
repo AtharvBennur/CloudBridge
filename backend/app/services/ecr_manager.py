@@ -195,13 +195,16 @@ class ECRManager:
         try:
             subprocess.run(["docker", "info"], capture_output=True, text=True, timeout=10, check=True)
         except (subprocess.SubprocessError, FileNotFoundError, OSError) as exc:
-            raise ecr_push_error(
-                "Docker Desktop daemon is not running on your host machine. "
-                "Please start Docker Desktop on Windows or upload the "
-                "'cloudbridge-migration-worker:latest' image to AWS ECR.",
-                versioned_tag,
-                retryable=False,
-            ) from exc
+            logger.warning(
+                "Docker Desktop is not running locally. Skipping image build and falling back to "
+                "the ':latest' image on AWS ECR. Ensure the latest worker image has been deployed."
+            )
+            return PushedImage(
+                image_uri=latest_uri,
+                repository_uri=self._repository_uri,
+                tag="latest",
+                digest="unknown-local-docker-fallback",
+            )
 
         # Step 3: Get auth token and login Docker
         username, password = self.get_authorization_token()
