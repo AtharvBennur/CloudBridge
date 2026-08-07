@@ -10,7 +10,9 @@ Handles:
 
 from __future__ import annotations
 
+import hashlib
 import logging
+import os
 import subprocess
 import time
 from dataclasses import dataclass
@@ -29,6 +31,29 @@ logger = logging.getLogger(__name__)
 
 REPO_NAME = "cloudbridge-migration-worker"
 IMAGE_TAG = "latest"
+
+
+def _compute_worker_hash(worker_dir: str) -> str:
+    """Compute a short SHA-256 hash of all files in the worker directory.
+
+    This lets us detect when worker code has changed and force a fresh image
+    build, while skipping the build when nothing has changed.
+    """
+    hasher = hashlib.sha256()
+    for root, dirs, files in os.walk(worker_dir):
+        # Ignore __pycache__ and .git
+        dirs[:] = sorted(d for d in dirs if d not in {"__pycache__", ".git"})
+        for fname in sorted(files):
+            if fname.endswith((".pyc", ".pyo")):
+                continue
+            fpath = os.path.join(root, fname)
+            hasher.update(fname.encode())
+            try:
+                with open(fpath, "rb") as f:
+                    hasher.update(f.read())
+            except OSError:
+                pass
+    return hasher.hexdigest()[:12]  # 12 hex chars is enough for uniqueness
 
 
 @dataclass(frozen=True)
@@ -116,36 +141,55 @@ class ECRManager:
     ) -> PushedImage:
         """Build the worker Docker image and push it to ECR.
 
+        Uses a content-hash-based tag so:
+        - A new image is ALWAYS built when any worker file changes.
+        - The same image is reused only when the code is identical.
+        - The :latest tag is also updated to point to the latest build.
+
         Args:
             worker_dir: Path to the worker/ directory containing Dockerfile
-            tag: Optional image tag (defaults to 'latest')
+            tag: Optional explicit image tag (overrides content-hash logic)
 
         Returns:
             PushedImage with the full ECR image URI
         """
-        image_tag = tag or IMAGE_TAG
-        image_uri = f"{self._repository_uri}:{image_tag}"
-
         # Step 1: Ensure repository exists
         self.ensure_repository()
 
-        # Step 1b: Check if image tag already exists in ECR to avoid unnecessary local builds
+        # Compute a content-hash tag so stale images are never reused
+        content_hash = _compute_worker_hash(worker_dir)
+        versioned_tag = tag or f"sha-{content_hash}"
+        versioned_uri = f"{self._repository_uri}:{versioned_tag}"
+        latest_uri = f"{self._repository_uri}:latest"
+
+        logger.info(
+            "Worker content hash: %s  →  tag: %s",
+            content_hash, versioned_tag,
+        )
+
+        # Check whether this exact content hash already exists in ECR
         try:
             images = self._ecr.describe_images(
                 repositoryName=REPO_NAME,
-                imageIds=[{"imageTag": image_tag}],
+                imageIds=[{"imageTag": versioned_tag}],
             ).get("imageDetails", [])
             if images:
                 digest = images[0].get("imageDigest", "existing")
-                logger.info("Found existing ECR image '%s' (digest: %s). Reusing existing image.", image_uri, digest)
+                logger.info(
+                    "ECR already has image for content hash '%s' (digest: %s). Reusing.",
+                    versioned_tag, digest,
+                )
                 return PushedImage(
-                    image_uri=image_uri,
+                    image_uri=latest_uri,   # always reference :latest for ECS
                     repository_uri=self._repository_uri,
-                    tag=image_tag,
+                    tag=versioned_tag,
                     digest=digest,
                 )
         except ClientError as exc:
-            logger.debug("Image tag '%s' not present in ECR, proceeding to docker build: %s", image_tag, exc)
+            logger.debug(
+                "Tag '%s' not present in ECR, will build fresh image: %s",
+                versioned_tag, exc,
+            )
 
         # Step 2: Check if local docker daemon is running
         try:
@@ -153,8 +197,9 @@ class ECRManager:
         except (subprocess.SubprocessError, FileNotFoundError, OSError) as exc:
             raise ecr_push_error(
                 "Docker Desktop daemon is not running on your host machine. "
-                "Please start Docker Desktop on Windows or upload the 'cloudbridge-migration-worker:latest' image to AWS ECR.",
-                image_tag,
+                "Please start Docker Desktop on Windows or upload the "
+                "'cloudbridge-migration-worker:latest' image to AWS ECR.",
+                versioned_tag,
                 retryable=False,
             ) from exc
 
@@ -162,17 +207,24 @@ class ECRManager:
         username, password = self.get_authorization_token()
         self._docker_login(password)
 
-        # Step 4: Build the image
-        self._docker_build(worker_dir, image_uri)
+        # Step 4: Build the image (tag with both versioned and :latest)
+        self._docker_build(worker_dir, versioned_uri)
 
-        # Step 5: Push the image
-        digest = self._docker_push(image_uri)
+        # Step 5: Also tag as :latest so ECS always pulls the newest version
+        subprocess.run(
+            ["docker", "tag", versioned_uri, latest_uri],
+            capture_output=True, text=True, check=False,
+        )
 
-        logger.info("Successfully pushed image: %s", image_uri)
+        # Step 6: Push both tags
+        digest = self._docker_push(versioned_uri)
+        self._docker_push(latest_uri)
+
+        logger.info("Successfully pushed image: %s (also tagged as :latest)", versioned_uri)
         return PushedImage(
-            image_uri=image_uri,
+            image_uri=latest_uri,   # ECS task uses :latest
             repository_uri=self._repository_uri,
-            tag=image_tag,
+            tag=versioned_tag,
             digest=digest,
         )
 
