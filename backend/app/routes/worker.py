@@ -25,9 +25,10 @@ worker_bp = Blueprint("worker", __name__, url_prefix="/worker")
 
 def _get_worker_secret() -> str:
     """Return the configured worker secret, falling back to SECRET_KEY."""
+    from flask import current_app
     return (
-        os.environ.get("WORKER_API_SECRET")
-        or os.environ.get("SECRET_KEY")
+        current_app.config.get("WORKER_API_SECRET")
+        or current_app.config.get("SECRET_KEY")
         or "cloudbridge-worker-secret"
     )
 
