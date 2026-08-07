@@ -8,6 +8,7 @@ from app.extensions import db
 health_bp = Blueprint("health", __name__)
 
 
+@health_bp.get("/")
 @health_bp.get("/health")
 def health_check():
     db_ok = True
