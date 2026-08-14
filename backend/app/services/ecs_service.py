@@ -76,6 +76,48 @@ class ECSService:
         self._log_info("ECS task created", task.id, migration_id)
         return task
 
+    def _build_worker_env_vars(
+        self,
+        migration: MigrationJob,
+        aws_connection: AWSConnection,
+    ) -> list[dict[str, str]]:
+        """Construct the environment variables for the ECS task."""
+        env_vars = [
+            {"name": "CLOUDBRIDGE_API_URL", "value": current_app.config.get("API_BASE_URL", "")},
+            {"name": "MIGRATION_ID", "value": str(migration.id)},
+            {"name": "AWS_CONNECTION_ID", "value": str(aws_connection.id)},
+            {"name": "AWS_DEFAULT_REGION", "value": aws_connection.aws_region},
+            {"name": "WORKER_API_SECRET", "value": (current_app.config.get("WORKER_API_SECRET") or current_app.config.get("SECRET_KEY") or "cloudbridge-worker-secret").strip()},
+            {"name": "SECRET_KEY", "value": (current_app.config.get("SECRET_KEY") or "cloudbridge-worker-secret").strip()},
+        ]
+
+        # Pass source DB credentials
+        if migration.source_database_config_id:
+            src_config = DatabaseConfig.query.get(migration.source_database_config_id)
+            if src_config:
+                env_vars.extend([
+                    {"name": "SOURCE_DB_HOST", "value": src_config.host},
+                    {"name": "SOURCE_DB_PORT", "value": str(src_config.port)},
+                    {"name": "SOURCE_DB_USERNAME", "value": src_config.username},
+                    {"name": "SOURCE_DB_NAME", "value": src_config.database_name or src_config.name},
+                ])
+                if src_config.secret_arn:
+                    env_vars.append({"name": "SOURCE_DB_SECRET_ARN", "value": src_config.secret_arn})
+
+        # Pass destination DB credentials
+        if migration.destination_database_config_id:
+            dst_config = DatabaseConfig.query.get(migration.destination_database_config_id)
+            if dst_config:
+                env_vars.extend([
+                    {"name": "DEST_DB_HOST", "value": dst_config.host},
+                    {"name": "DEST_DB_PORT", "value": str(dst_config.port)},
+                    {"name": "DEST_DB_USERNAME", "value": dst_config.username},
+                    {"name": "DEST_DB_NAME", "value": dst_config.database_name or dst_config.name},
+                ])
+                if dst_config.secret_arn:
+                    env_vars.append({"name": "DEST_DB_SECRET_ARN", "value": dst_config.secret_arn})
+        return env_vars
+
     def start_task(self, task_id: int) -> ECSTask:
         """Start an ECS task using AWS ECS API."""
         task = ECSTask.query.get(task_id)
@@ -85,6 +127,10 @@ class ECSService:
         aws_connection = AWSConnection.query.get(task.aws_connection_id)
         if not aws_connection:
             raise ECSTaskNotFoundError(f"AWS connection {task.aws_connection_id} was not found.")
+
+        migration = MigrationJob.query.get(task.migration_id)
+        if not migration:
+            raise ECSTaskNotFoundError(f"Migration job {task.migration_id} was not found.")
 
         try:
             # Get credentials via AssumeRole
@@ -97,6 +143,9 @@ class ECSService:
             # Parse subnet and security group IDs
             subnet_ids = json.loads(task.subnet_ids) if task.subnet_ids else []
             security_group_ids = json.loads(task.security_group_ids) if task.security_group_ids else []
+
+            # Build environment variables for worker
+            env_vars = self._build_worker_env_vars(migration, aws_connection)
 
             # Start ECS task
             ecs_client = self._aws_client.get_boto3_client("ecs", credentials=credentials, region=aws_connection.aws_region)
@@ -112,6 +161,18 @@ class ECSService:
                         "assignPublicIp": "ENABLED",
                     }
                 } if subnet_ids else None,
+                overrides={
+                    "containerOverrides": [
+                        {
+                            "name": "migration-worker",
+                            "environment": env_vars,
+                        },
+                        {
+                            "name": "cloudbridge-worker",
+                            "environment": env_vars,
+                        }
+                    ]
+                },
             )
 
             if response["tasks"]:
@@ -439,41 +500,7 @@ class ECSService:
         db.session.commit()
 
         # Step 6: Resolve database credentials for the worker
-        env_vars = [
-            {"name": "CLOUDBRIDGE_API_URL", "value": current_app.config.get("API_BASE_URL", "")},
-            {"name": "MIGRATION_ID", "value": str(migration.id)},
-            {"name": "AWS_CONNECTION_ID", "value": str(aws_connection.id)},
-            {"name": "AWS_DEFAULT_REGION", "value": aws_connection.aws_region},
-            {"name": "WORKER_API_SECRET", "value": (current_app.config.get("WORKER_API_SECRET") or current_app.config.get("SECRET_KEY") or "cloudbridge-worker-secret").strip()},
-            {"name": "SECRET_KEY", "value": (current_app.config.get("SECRET_KEY") or "cloudbridge-worker-secret").strip()},
-        ]
-
-        # Pass source DB credentials
-        if migration.source_database_config_id:
-            src_config = DatabaseConfig.query.get(migration.source_database_config_id)
-            if src_config:
-                env_vars.extend([
-                    {"name": "SOURCE_DB_HOST", "value": src_config.host},
-                    {"name": "SOURCE_DB_PORT", "value": str(src_config.port)},
-                    {"name": "SOURCE_DB_USERNAME", "value": src_config.username},
-                    {"name": "SOURCE_DB_NAME", "value": src_config.database_name or src_config.name},
-                ])
-                # If secret_arn is set, pass it for Secrets Manager retrieval
-                if src_config.secret_arn:
-                    env_vars.append({"name": "SOURCE_DB_SECRET_ARN", "value": src_config.secret_arn})
-
-        # Pass destination DB credentials
-        if migration.destination_database_config_id:
-            dst_config = DatabaseConfig.query.get(migration.destination_database_config_id)
-            if dst_config:
-                env_vars.extend([
-                    {"name": "DEST_DB_HOST", "value": dst_config.host},
-                    {"name": "DEST_DB_PORT", "value": str(dst_config.port)},
-                    {"name": "DEST_DB_USERNAME", "value": dst_config.username},
-                    {"name": "DEST_DB_NAME", "value": dst_config.database_name or dst_config.name},
-                ])
-                if dst_config.secret_arn:
-                    env_vars.append({"name": "DEST_DB_SECRET_ARN", "value": dst_config.secret_arn})
+        env_vars = self._build_worker_env_vars(migration, aws_connection)
 
         # Step 7: Launch the ECS task
         try:
