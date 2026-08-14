@@ -26,11 +26,12 @@ worker_bp = Blueprint("worker", __name__, url_prefix="/worker")
 def _get_worker_secret() -> str:
     """Return the configured worker secret, falling back to SECRET_KEY."""
     from flask import current_app
-    return (
+    val = (
         current_app.config.get("WORKER_API_SECRET")
         or current_app.config.get("SECRET_KEY")
         or "cloudbridge-worker-secret"
     )
+    return val.strip() if isinstance(val, str) else val
 
 
 def worker_required(f: Callable) -> Callable:
@@ -38,7 +39,7 @@ def worker_required(f: Callable) -> Callable:
 
     @wraps(f)
     def decorated(*args: Any, **kwargs: Any) -> Any:
-        provided = request.headers.get("X-Worker-Secret", "")
+        provided = request.headers.get("X-Worker-Secret", "").strip()
         expected = _get_worker_secret()
         if not provided or provided != expected:
             return jsonify({"error": {"message": "Unauthorized: invalid worker secret"}}), 401

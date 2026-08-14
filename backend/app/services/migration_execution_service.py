@@ -403,8 +403,8 @@ class MigrationExecutionService:
             {"name": "AWS_ACCESS_KEY_ID", "value": current_app.config.get("AWS_ACCESS_KEY_ID", "")},
             {"name": "AWS_SECRET_ACCESS_KEY", "value": current_app.config.get("AWS_SECRET_ACCESS_KEY", "")},
             # Worker auth: shared secret so the ECS task can call /worker/* internal API
-            {"name": "WORKER_API_SECRET", "value": current_app.config.get("WORKER_API_SECRET") or current_app.config.get("SECRET_KEY") or "cloudbridge-worker-secret"},
-            {"name": "SECRET_KEY", "value": current_app.config.get("SECRET_KEY") or "cloudbridge-worker-secret"},
+            {"name": "WORKER_API_SECRET", "value": (current_app.config.get("WORKER_API_SECRET") or current_app.config.get("SECRET_KEY") or "cloudbridge-worker-secret").strip()},
+            {"name": "SECRET_KEY", "value": (current_app.config.get("SECRET_KEY") or "cloudbridge-worker-secret").strip()},
         ]
 
         if migration.source_database_config_id:

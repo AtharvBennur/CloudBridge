@@ -77,6 +77,7 @@ if not WORKER_API_SECRET:
     # Fall back to SECRET_KEY if WORKER_API_SECRET is not set
     WORKER_API_SECRET = os.environ.get("SECRET_KEY", "") or "cloudbridge-worker-secret"
     logger.warning("WORKER_API_SECRET not set, falling back to SECRET_KEY")
+WORKER_API_SECRET = WORKER_API_SECRET.strip()
 
 # Source DB credentials (passed as env vars by ECS task)
 SOURCE_DB_HOST = os.environ.get("SOURCE_DB_HOST", "")
