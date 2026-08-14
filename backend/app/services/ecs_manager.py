@@ -97,6 +97,10 @@ class ECSManager:
                         {
                             "name": "migration-worker",
                             "environment": env_vars,
+                        },
+                        {
+                            "name": "cloudbridge-worker",
+                            "environment": env_vars,
                         }
                     ]
                 },

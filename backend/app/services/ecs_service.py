@@ -444,6 +444,8 @@ class ECSService:
             {"name": "MIGRATION_ID", "value": str(migration.id)},
             {"name": "AWS_CONNECTION_ID", "value": str(aws_connection.id)},
             {"name": "AWS_DEFAULT_REGION", "value": aws_connection.aws_region},
+            {"name": "WORKER_API_SECRET", "value": (current_app.config.get("WORKER_API_SECRET") or current_app.config.get("SECRET_KEY") or "cloudbridge-worker-secret").strip()},
+            {"name": "SECRET_KEY", "value": (current_app.config.get("SECRET_KEY") or "cloudbridge-worker-secret").strip()},
         ]
 
         # Pass source DB credentials
@@ -491,6 +493,10 @@ class ECSService:
                     "containerOverrides": [
                         {
                             "name": "migration-worker",
+                            "environment": env_vars,
+                        },
+                        {
+                            "name": "cloudbridge-worker",
                             "environment": env_vars,
                         }
                     ]
