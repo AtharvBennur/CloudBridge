@@ -82,8 +82,13 @@ class ECSService:
         aws_connection: AWSConnection,
     ) -> list[dict[str, str]]:
         """Construct the environment variables for the ECS task."""
+        # Construct API URL from config
+        api_base_url = current_app.config.get("API_BASE_URL", "")
+        if not api_base_url or "onrender.com" not in api_base_url:
+            api_base_url = "https://cloudbridge-2-a0fp.onrender.com"
+
         env_vars = [
-            {"name": "CLOUDBRIDGE_API_URL", "value": current_app.config.get("API_BASE_URL", "")},
+            {"name": "CLOUDBRIDGE_API_URL", "value": api_base_url},
             {"name": "MIGRATION_ID", "value": str(migration.id)},
             {"name": "AWS_CONNECTION_ID", "value": str(aws_connection.id)},
             {"name": "AWS_DEFAULT_REGION", "value": aws_connection.aws_region},
