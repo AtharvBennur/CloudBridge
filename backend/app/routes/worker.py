@@ -39,9 +39,15 @@ def worker_required(f: Callable) -> Callable:
 
     @wraps(f)
     def decorated(*args: Any, **kwargs: Any) -> Any:
+        from flask import current_app
         provided = request.headers.get("X-Worker-Secret", "").strip()
         expected = _get_worker_secret()
         if not provided or provided != expected:
+            prov_preview = f"{provided[:4]}...{provided[-4:]}" if len(provided) > 8 else provided
+            exp_preview = f"{expected[:4]}...{expected[-4:]}" if len(expected) > 8 else expected
+            current_app.logger.warning(
+                f"Worker auth failed. Provided: '{prov_preview}', Expected: '{exp_preview}'"
+            )
             return jsonify({"error": {"message": "Unauthorized: invalid worker secret"}}), 401
         return f(*args, **kwargs)
 
