@@ -166,10 +166,6 @@ class ECSService:
                         {
                             "name": "migration-worker",
                             "environment": env_vars,
-                        },
-                        {
-                            "name": "cloudbridge-worker",
-                            "environment": env_vars,
                         }
                     ]
                 },
@@ -520,10 +516,6 @@ class ECSService:
                     "containerOverrides": [
                         {
                             "name": "migration-worker",
-                            "environment": env_vars,
-                        },
-                        {
-                            "name": "cloudbridge-worker",
                             "environment": env_vars,
                         }
                     ]
