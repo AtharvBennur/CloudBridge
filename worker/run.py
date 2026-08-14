@@ -75,7 +75,7 @@ AWS_REGION = os.environ.get("AWS_DEFAULT_REGION", "us-east-1")
 WORKER_API_SECRET = os.environ.get("WORKER_API_SECRET", "")
 if not WORKER_API_SECRET:
     # Fall back to SECRET_KEY if WORKER_API_SECRET is not set
-    WORKER_API_SECRET = os.environ.get("SECRET_KEY", "cloudbridge-worker-secret")
+    WORKER_API_SECRET = os.environ.get("SECRET_KEY", "") or "cloudbridge-worker-secret"
     logger.warning("WORKER_API_SECRET not set, falling back to SECRET_KEY")
 
 # Source DB credentials (passed as env vars by ECS task)
