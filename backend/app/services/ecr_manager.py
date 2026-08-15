@@ -167,29 +167,9 @@ class ECRManager:
             content_hash, versioned_tag,
         )
 
-        # Check whether this exact content hash already exists in ECR
-        try:
-            images = self._ecr.describe_images(
-                repositoryName=REPO_NAME,
-                imageIds=[{"imageTag": versioned_tag}],
-            ).get("imageDetails", [])
-            if images:
-                digest = images[0].get("imageDigest", "existing")
-                logger.info(
-                    "ECR already has image for content hash '%s' (digest: %s). Reusing.",
-                    versioned_tag, digest,
-                )
-                return PushedImage(
-                    image_uri=latest_uri,   # always reference :latest for ECS
-                    repository_uri=self._repository_uri,
-                    tag=versioned_tag,
-                    digest=digest,
-                )
-        except ClientError as exc:
-            logger.debug(
-                "Tag '%s' not present in ECR, will build fresh image: %s",
-                versioned_tag, exc,
-            )
+        # Force rebuild to ensure latest worker code is used
+        # Skip cache check to ensure we always get the latest run.py fixes
+        logger.info("Forcing worker image rebuild to ensure latest code changes are applied")
 
         # Step 2: Check if local docker daemon is running
         try:
@@ -291,3 +271,25 @@ class ECRManager:
                     if part == "sha256:" and i + 1 < len(parts):
                         return f"sha256:{parts[i + 1]}"
         return "unknown"
+
+
+def _compute_worker_hash(worker_dir: str) -> str:
+    """Compute a content hash of all worker files to detect changes."""
+    hasher = hashlib.sha256()
+    
+    for root, dirs, files in os.walk(worker_dir):
+        # Exclude __pycache__ and other non-source files
+        dirs[:] = [d for d in dirs if d not in ["__pycache__", ".git", "node_modules"]]
+        
+        for file in files:
+            if file.endswith((".pyc", ".pyo", ".pyd")):
+                continue
+            
+            file_path = os.path.join(root, file)
+            try:
+                with open(file_path, "rb") as f:
+                    hasher.update(f.read())
+            except (IOError, OSError):
+                continue
+    
+    return hasher.hexdigest()
