@@ -170,6 +170,26 @@ class ECRManager:
         # Force rebuild to ensure latest worker code is used
         # Skip cache check to ensure we always get the latest run.py fixes
         logger.info("Forcing worker image rebuild to ensure latest code changes are applied")
+        
+        # Delete existing :latest tag to force fresh rebuild
+        try:
+            self._ecr.batch_delete_image(
+                repositoryName=REPO_NAME,
+                imageIds=[{"imageTag": "latest"}]
+            )
+            logger.info("Deleted existing :latest tag to force rebuild")
+        except ClientError as exc:
+            logger.debug(f"No existing :latest tag to delete: {exc}")
+        
+        # Delete existing :latest tag to force fresh rebuild
+        try:
+            self._ecr.batch_delete_image(
+                repositoryName=REPO_NAME,
+                imageIds=[{"imageTag": "latest"}]
+            )
+            logger.info("Deleted existing :latest tag to force rebuild")
+        except ClientError as exc:
+            logger.debug(f"No existing :latest tag to delete: {exc}")
 
         # Step 2: Check if local docker daemon is running
         try:
