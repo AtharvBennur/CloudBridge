@@ -14,14 +14,17 @@ Migration Service
 */
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ArrowLeft, Database, CalendarDays, FolderKanban, Play, Pause, RotateCcw, X } from "lucide-react";
+import { ArrowLeft, Database, CalendarDays, FolderKanban, Play, Pause, RotateCcw, X, Terminal } from "lucide-react";
 import { useNavigate, useParams } from "react-router-dom";
+import { useEffect, useState } from "react";
 
 import { StatusBadge } from "@/components/migrations/StatusBadge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { migrationService } from "@/services/migrationService";
 import { useToast } from "@/components/ui/toast";
+import { websocketService } from "@/services/websocketService";
+import { env } from "@/lib/env";
 
 function formatDate(value: string) {
   return new Date(value).toLocaleString();
@@ -33,6 +36,35 @@ export function MigrationDetailPage() {
   const migrationId = Number(id);
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const [logs, setLogs] = useState<string[]>([]);
+  const [isConnected, setIsConnected] = useState(false);
+
+  // WebSocket connection for real-time logs
+  useEffect(() => {
+    if (!Number.isFinite(migrationId)) return;
+
+    const wsUrl = env.wsBaseUrl;
+    websocketService.connect(wsUrl)
+      .then(() => {
+        setIsConnected(true);
+        websocketService.joinMigration(migrationId);
+        
+        // Listen for migration updates including logs
+        websocketService.onAllMigrationUpdates((data) => {
+          if (data.type === "logs" && data.logs) {
+            setLogs(prev => [...prev, ...data.logs]);
+          }
+        });
+      })
+      .catch((error) => {
+        console.error("WebSocket connection failed:", error);
+      });
+
+    return () => {
+      websocketService.leaveMigration(migrationId);
+      websocketService.disconnect();
+    };
+  }, [migrationId]);
 
   const migrationQuery = useQuery({
     queryKey: ["migration", migrationId],
@@ -233,6 +265,32 @@ export function MigrationDetailPage() {
                 <p className="font-medium text-foreground">Updated</p>
                 <p>{formatDate(migration.updated_at)}</p>
               </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Migration Logs</CardTitle>
+            <CardDescription>Real-time logs from the ECS worker</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="flex items-center gap-2 mb-4">
+              <Terminal className="h-4 w-4 text-primary" />
+              <span className="text-sm text-muted-foreground">
+                {isConnected ? "Connected" : "Disconnected"}
+              </span>
+            </div>
+            <div className="bg-black text-green-400 font-mono text-xs p-4 rounded-lg h-64 overflow-y-auto">
+              {logs.length > 0 ? (
+                logs.map((log, index) => (
+                  <div key={index} className="border-b border-gray-800 py-1">
+                    {log}
+                  </div>
+                ))
+              ) : (
+                <div className="text-gray-500">No logs available yet...</div>
+              )}
             </div>
           </CardContent>
         </Card>

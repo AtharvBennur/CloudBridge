@@ -119,6 +119,18 @@ class WebSocketService {
     }
   }
 
+  onMigrationLogs(callback: (data: any) => void): void {
+    if (this.socket) {
+      this.socket.on("migration_logs", callback);
+    }
+  }
+
+  onAllMigrationUpdates(callback: (data: any) => void): void {
+    if (this.socket) {
+      this.socket.on("migration_update", callback);
+    }
+  }
+
   onMessage(callback: (message: WebSocketMessage) => void): void {
     if (this.socket) {
       this.socket.on("message", callback);

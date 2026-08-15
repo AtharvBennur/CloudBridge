@@ -1,6 +1,6 @@
 export const env = {
   apiBaseUrl: import.meta.env.VITE_API_BASE_URL || (import.meta.env.DEV ? "/api" : "http://127.0.0.1:5000"),
-  wsBaseUrl: import.meta.env.VITE_WS_BASE_URL || import.meta.env.VITE_API_BASE_URL?.replace("http", "ws") || "ws://127.0.0.1:5000",
+  wsBaseUrl: import.meta.env.VITE_WS_BASE_URL || (import.meta.env.VITE_API_BASE_URL?.replace("http", "ws") || "ws://127.0.0.1:5000"),
   appName: import.meta.env.VITE_APP_NAME || "CloudBridge",
   appVersion: import.meta.env.VITE_APP_VERSION || "1.0.0",
   debug: import.meta.env.VITE_DEBUG === "true",
