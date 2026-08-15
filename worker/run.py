@@ -164,11 +164,16 @@ def get_source_credentials() -> dict[str, Any]:
     if not password and SOURCE_DB_SECRET_ARN:
         # Fall back to Secrets Manager
         logger.info(f"Password not provided in env, fetching from Secrets Manager: {SOURCE_DB_SECRET_ARN}")
-        secret = resolve_secret_credentials(SOURCE_DB_SECRET_ARN, AWS_REGION)
-        password = secret.get("password", "")
+        try:
+            secret = resolve_secret_credentials(SOURCE_DB_SECRET_ARN, AWS_REGION)
+            password = secret.get("password", "")
+        except Exception as exc:
+            logger.error(f"Failed to retrieve secret from Secrets Manager: {exc}")
+            logger.warning("Continuing without password - this will likely fail")
     
     if not password:
-        raise RuntimeError("Source database password not available - neither in env nor in Secrets Manager")
+        logger.error("Source database password not available - neither in env nor in Secrets Manager")
+        raise RuntimeError("Source database password not available - migration cannot proceed")
     
     return {
         "host": SOURCE_DB_HOST,
@@ -186,11 +191,16 @@ def get_destination_credentials() -> dict[str, Any]:
     if not password and DEST_DB_SECRET_ARN:
         # Fall back to Secrets Manager
         logger.info(f"Password not provided in env, fetching from Secrets Manager: {DEST_DB_SECRET_ARN}")
-        secret = resolve_secret_credentials(DEST_DB_SECRET_ARN, AWS_REGION)
-        password = secret.get("password", "")
+        try:
+            secret = resolve_secret_credentials(DEST_DB_SECRET_ARN, AWS_REGION)
+            password = secret.get("password", "")
+        except Exception as exc:
+            logger.error(f"Failed to retrieve secret from Secrets Manager: {exc}")
+            logger.warning("Continuing without password - this will likely fail")
     
     if not password:
-        raise RuntimeError("Destination database password not available - neither in env nor in Secrets Manager")
+        logger.error("Destination database password not available - neither in env nor in Secrets Manager")
+        raise RuntimeError("Destination database password not available - migration cannot proceed")
     
     return {
         "host": DEST_DB_HOST,
