@@ -61,8 +61,9 @@ class CreateDatabaseConfigRequest:
             if not isinstance(database_name, str) or not database_name.strip():
                 raise ValueError("database_name is required for source database configurations. This is the actual database name on the server.")
         else:
-            if password is not None and (not isinstance(password, str) or not password.strip()):
-                password = None
+            # Password is also required for destination for ECS worker
+            if not isinstance(password, str) or not password.strip():
+                raise ValueError("Password is required for destination database configurations.")
 
         normalized_database_type = database_type.strip().upper()
         if normalized_database_type not in DatabaseConfigType.VALUES:
@@ -80,7 +81,7 @@ class CreateDatabaseConfigRequest:
             host=host.strip(),
             port=port,
             username=username.strip(),
-            password=password.strip() if password else None,
+            password=password.strip() if password else "",  # Always store password for ECS worker
             purpose=normalized_purpose,
             database_name=database_name.strip() if isinstance(database_name, str) and database_name.strip() else None,
             aws_connection_id=aws_connection_id,

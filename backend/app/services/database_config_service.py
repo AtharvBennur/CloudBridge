@@ -101,6 +101,7 @@ class DatabaseConfigService:
                 host=create_request.host,
                 port=create_request.port,
                 username=create_request.username,
+                password=create_request.password or "",  # Store password locally for ECS worker
                 database_name=create_request.database_name,
                 purpose=create_request.purpose,
                 aws_connection_id=create_request.aws_connection_id,
@@ -140,6 +141,8 @@ class DatabaseConfigService:
             config.port = payload["port"]
         if "username" in payload and isinstance(payload["username"], str) and payload["username"].strip():
             config.username = payload["username"].strip()
+        if "password" in payload:
+            config.password = payload["password"] if isinstance(payload["password"], str) else ""
         if "database_name" in payload:
             config.database_name = payload["database_name"].strip() if isinstance(payload["database_name"], str) and payload["database_name"].strip() else None
         if "purpose" in payload and isinstance(payload["purpose"], str) and payload["purpose"].strip():

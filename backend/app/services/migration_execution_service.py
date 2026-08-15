@@ -413,7 +413,8 @@ class MigrationExecutionService:
                 # Always use password from database config, ignore secret_arn for now
                 password_value = getattr(src, 'password', None) or ""
                 if not password_value:
-                    logger.warning(f"Source database config {src.id} has no password set")
+                    logger.error(f"Source database config {src.id} has no password set - cannot proceed")
+                    raise RuntimeError(f"Source database config {src.id} ({src.name}) has no password set. Please edit the database config and provide the password.")
                 env_vars.extend([
                     {"name": "SOURCE_DB_HOST", "value": src.host},
                     {"name": "SOURCE_DB_PORT", "value": str(src.port)},
@@ -422,9 +423,6 @@ class MigrationExecutionService:
                     {"name": "SOURCE_DB_NAME", "value": src.database_name or src.name},
                     {"name": "SOURCE_DB_ENGINE", "value": src.database_type or "POSTGRESQL"},
                 ])
-                # Only include secret_arn if password is not available
-                if not password_value and src.secret_arn:
-                    env_vars.append({"name": "SOURCE_DB_SECRET_ARN", "value": src.secret_arn})
 
         if migration.destination_database_config_id:
             dst = db.session.get(DatabaseConfig, migration.destination_database_config_id)
@@ -432,7 +430,8 @@ class MigrationExecutionService:
                 # Always use password from database config, ignore secret_arn for now
                 password_value = getattr(dst, 'password', None) or ""
                 if not password_value:
-                    logger.warning(f"Destination database config {dst.id} has no password set")
+                    logger.error(f"Destination database config {dst.id} has no password set - cannot proceed")
+                    raise RuntimeError(f"Destination database config {dst.id} ({dst.name}) has no password set. Please edit the database config and provide the password.")
                 env_vars.extend([
                     {"name": "DEST_DB_HOST", "value": dst.host},
                     {"name": "DEST_DB_PORT", "value": str(dst.port)},
@@ -441,9 +440,6 @@ class MigrationExecutionService:
                     {"name": "DEST_DB_NAME", "value": dst.database_name or dst.name},
                     {"name": "DEST_DB_ENGINE", "value": dst.database_type or "POSTGRESQL"},
                 ])
-                # Only include secret_arn if password is not available
-                if not password_value and dst.secret_arn:
-                    env_vars.append({"name": "DEST_DB_SECRET_ARN", "value": dst.secret_arn})
 
         return env_vars
 
