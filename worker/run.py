@@ -247,7 +247,6 @@ def get_db_connection(creds: dict[str, Any], engine: str = "POSTGRESQL"):
             connect_timeout=300,
             read_timeout=300,
             write_timeout=300,
-            cursorclass=pymysql.cursors.DictCursor,
             charset='utf8mb4',
         )
         return conn
@@ -266,12 +265,13 @@ def discover_tables(conn, engine: str = "POSTGRESQL") -> list[str]:
         with conn.cursor() as cur:
             cur.execute(
                 """
-                SELECT table_name FROM information_schema.tables
+                SELECT TABLE_NAME FROM information_schema.tables
                 WHERE table_schema = DATABASE() AND table_type = 'BASE TABLE'
-                ORDER BY table_name
+                ORDER BY TABLE_NAME
                 """
             )
-            return [row['table_name'] for row in cur.fetchall()]
+            # MySQL returns tuples with DictCursor removed
+            return [row[0] for row in cur.fetchall()]
     else:  # POSTGRESQL
         with conn.cursor() as cur:
             cur.execute(
@@ -289,7 +289,8 @@ def get_table_row_count(conn, table: str, engine: str = "POSTGRESQL") -> int:
         with conn.cursor() as cur:
             cur.execute(f'SELECT COUNT(*) as cnt FROM `{table}`')
             result = cur.fetchone()
-            return result['cnt'] if isinstance(result, dict) else result[0]
+            # MySQL returns tuple with the count
+            return result[0]
     else:  # POSTGRESQL
         with conn.cursor() as cur:
             cur.execute(f'SELECT COUNT(*) FROM "{table}"')
@@ -302,13 +303,14 @@ def get_table_columns(conn, table: str, engine: str = "POSTGRESQL") -> list[tupl
         with conn.cursor() as cur:
             cur.execute(
                 """
-                SELECT column_name, data_type FROM information_schema.columns
+                SELECT COLUMN_NAME, DATA_TYPE FROM information_schema.columns
                 WHERE table_schema = DATABASE() AND table_name = %s
                 ORDER BY ordinal_position
                 """,
                 (table,),
             )
-            return [(row['column_name'], row['data_type']) for row in cur.fetchall()]
+            # MySQL returns tuples without DictCursor
+            return [(row[0], row[1]) for row in cur.fetchall()]
     else:  # POSTGRESQL
         with conn.cursor() as cur:
             cur.execute(
@@ -418,11 +420,8 @@ def copy_table_in_batches(
 
         with dest_conn.cursor() as cur:
             for row in rows:
-                # Convert dict to tuple if using MySQL DictCursor
-                if isinstance(row, dict):
-                    row_values = tuple(row[c] for c in col_names)
-                else:
-                    row_values = row
+                # No need to convert dict to tuple since we removed DictCursor
+                row_values = row
                 
                 if dest_engine == "MYSQL":
                     cur.execute(
