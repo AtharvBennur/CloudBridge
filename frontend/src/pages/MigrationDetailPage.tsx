@@ -203,12 +203,12 @@ export function MigrationDetailPage() {
             </div>
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="rounded-lg border p-3">
-                <p className="text-sm font-semibold">Source database</p>
-                <p className="mt-1 text-sm text-muted-foreground">{migration.source_database}</p>
+                <p className="text-sm font-semibold">Source database ID</p>
+                <p className="mt-1 text-sm text-muted-foreground">{migration.source_database_config_id || "Not set"}</p>
               </div>
               <div className="rounded-lg border p-3">
-                <p className="text-sm font-semibold">Destination database</p>
-                <p className="mt-1 text-sm text-muted-foreground">{migration.destination_database}</p>
+                <p className="text-sm font-semibold">Destination database ID</p>
+                <p className="mt-1 text-sm text-muted-foreground">{migration.destination_database_config_id || "Not set"}</p>
               </div>
             </div>
           </CardContent>

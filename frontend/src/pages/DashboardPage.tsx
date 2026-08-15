@@ -370,7 +370,7 @@ export function DashboardPage() {
                   <div className="flex-1">
                     <h4 className="font-semibold text-sm text-foreground">{migration.job_name}</h4>
                     <p className="text-xs text-muted-foreground mt-0.5">
-                      {migration.source_database} &rarr; {migration.destination_database}
+                      ID {migration.source_database_config_id} &rarr; ID {migration.destination_database_config_id}
                     </p>
                   </div>
                 </div>

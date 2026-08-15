@@ -38,8 +38,8 @@ export function MigrationEditPage() {
     mutationFn: (values: MigrationFormValues) =>
       migrationService.update(migrationId, {
         job_name: values.job_name,
-        source_database: values.source_database,
-        destination_database: values.destination_database,
+        source_database_config_id: parseInt(values.source_database_config_id),
+        destination_database_config_id: parseInt(values.destination_database_config_id),
         status: values.status,
         description: values.description,
       }),
@@ -60,8 +60,8 @@ export function MigrationEditPage() {
 
     return {
       job_name: migrationQuery.data.job_name,
-      source_database: migrationQuery.data.source_database,
-      destination_database: migrationQuery.data.destination_database,
+      source_database_config_id: migrationQuery.data.source_database_config_id?.toString() || "",
+      destination_database_config_id: migrationQuery.data.destination_database_config_id?.toString() || "",
       status: migrationQuery.data.status,
       description: migrationQuery.data.description || "",
     };

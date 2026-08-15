@@ -269,7 +269,7 @@ export function ECSPage() {
                   <option value="">Choose a migration...</option>
                   {migrations.map((m) => (
                     <option key={m.id} value={m.id}>
-                      {m.job_name} — {m.source_database} → {m.destination_database}
+                      {m.job_name} — ID {m.source_database_config_id} → ID {m.destination_database_config_id}
                     </option>
                   ))}
                 </select>

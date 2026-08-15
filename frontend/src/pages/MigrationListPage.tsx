@@ -46,16 +46,16 @@ export function MigrationListPage() {
       accessor: (row) => <span className="font-semibold text-foreground">{row.job_name}</span>,
     },
     {
-      key: "source_database",
-      header: "Source",
-      accessor: (row) => <span className="text-muted-foreground">{row.source_database}</span>,
+      key: "source_database_config_id",
+      header: "Source ID",
+      accessor: (row) => <span className="text-muted-foreground">{row.source_database_config_id || "N/A"}</span>,
     },
     {
-      key: "destination_database",
-      header: "Destination",
+      key: "destination_database_config_id",
+      header: "Destination ID",
       accessor: (row) => (
         <span className="text-muted-foreground flex items-center gap-1">
-          {row.destination_database}
+          {row.destination_database_config_id || "N/A"}
           <ArrowRight className="h-3 w-3" />
         </span>
       ),

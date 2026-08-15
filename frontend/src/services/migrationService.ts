@@ -20,13 +20,11 @@ import { apiClient } from "@/services/apiClient";
 export interface MigrationJob {
   id: number;
   job_name: string;
-  source_database: string;
-  destination_database: string;
+  source_database_config_id: number | null;
+  destination_database_config_id: number | null;
   status: string;
   description: string | null;
   aws_connection_id: number | null;
-  source_database_config_id: number | null;
-  destination_database_config_id: number | null;
   progress_percent: number;
   rows_migrated: number;
   total_rows: number | null;
@@ -34,19 +32,22 @@ export interface MigrationJob {
   error_message: string | null;
   created_at: string;
   updated_at: string;
+  // Legacy fields for backward compatibility
+  source_database?: string;
+  destination_database?: string;
 }
 
 export interface CreateMigrationPayload {
   job_name: string;
-  source_database: string;
-  destination_database: string;
+  source_database_config_id: number;
+  destination_database_config_id: number;
   description?: string;
 }
 
 export interface UpdateMigrationPayload {
   job_name?: string;
-  source_database?: string;
-  destination_database?: string;
+  source_database_config_id?: number;
+  destination_database_config_id?: number;
   status?: string;
   description?: string;
 }

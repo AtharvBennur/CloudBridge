@@ -19,8 +19,8 @@ import { Label } from "@/components/ui/label";
 
 export interface MigrationFormValues {
   job_name: string;
-  source_database: string;
-  destination_database: string;
+  source_database_config_id: string;
+  destination_database_config_id: string;
   status?: string;
   description: string;
 }
@@ -36,8 +36,8 @@ interface MigrationFormProps {
 
 const emptyValues = (initialValues: MigrationFormValues): MigrationFormValues => ({
   job_name: initialValues.job_name || "",
-  source_database: initialValues.source_database || "",
-  destination_database: initialValues.destination_database || "",
+  source_database_config_id: initialValues.source_database_config_id || "",
+  destination_database_config_id: initialValues.destination_database_config_id || "",
   status: initialValues.status || "PENDING",
   description: initialValues.description || "",
 });
@@ -78,27 +78,27 @@ export function MigrationForm({
             required
           />
         </div>
-
-        <div className="space-y-2">
-          <Label htmlFor="source_database">Source database</Label>
-          <Input
-            id="source_database"
-            value={values.source_database}
-            onChange={(event) => handleChange("source_database", event.target.value)}
-            placeholder="Example: postgres-prod"
-            required
-          />
-        </div>
       </div>
 
       <div className="grid gap-4 md:grid-cols-2">
         <div className="space-y-2">
-          <Label htmlFor="destination_database">Destination database</Label>
+          <Label htmlFor="source_database_config_id">Source database ID</Label>
           <Input
-            id="destination_database"
-            value={values.destination_database}
-            onChange={(event) => handleChange("destination_database", event.target.value)}
-            placeholder="Example: postgres-staging"
+            id="source_database_config_id"
+            value={values.source_database_config_id}
+            onChange={(event) => handleChange("source_database_config_id", event.target.value)}
+            placeholder="Database config ID"
+            required
+          />
+        </div>
+
+        <div className="space-y-2">
+          <Label htmlFor="destination_database_config_id">Destination database ID</Label>
+          <Input
+            id="destination_database_config_id"
+            value={values.destination_database_config_id}
+            onChange={(event) => handleChange("destination_database_config_id", event.target.value)}
+            placeholder="Database config ID"
             required
           />
         </div>
