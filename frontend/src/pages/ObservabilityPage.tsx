@@ -1,6 +1,7 @@
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { motion } from "framer-motion";
+import { useNavigate } from "react-router-dom";
 import {
   BarChart3,
   Activity,
@@ -10,6 +11,8 @@ import {
   CheckCircle2,
   Download,
   Loader2,
+  Play,
+  Zap,
 } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
@@ -24,14 +27,24 @@ import {
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { observabilityService } from "@/services/observabilityService";
+import { migrationService } from "@/services/migrationService";
+import { useToast } from "@/components/ui/toast";
 
 export function ObservabilityPage() {
+  const navigate = useNavigate();
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
   const [showMetrics, setShowMetrics] = useState(false);
   const [exporting, setExporting] = useState(false);
 
   const auditLogsQuery = useQuery({
     queryKey: ["audit-logs"],
     queryFn: () => observabilityService.getAuditLogs({ limit: 50 }),
+  });
+
+  const migrationsQuery = useQuery({
+    queryKey: ["migrations"],
+    queryFn: () => migrationService.list(),
   });
 
   const systemMetricsQuery = useQuery({
@@ -47,6 +60,22 @@ export function ObservabilityPage() {
 
   const logs = auditLogsQuery.data || [];
   const metrics = systemMetricsQuery.data;
+  const migrations = migrationsQuery.data || [];
+
+  const pendingMigrations = migrations.filter(m => m.status === "PENDING");
+  const latestPendingMigration = pendingMigrations.length > 0 ? pendingMigrations[0] : null;
+
+  const startMigrationMutation = useMutation({
+    mutationFn: (migrationId: number) => 
+      migrationService.start(migrationId, latestPendingMigration?.aws_connection_id ?? undefined),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["migrations"] });
+      toast({ title: "Migration started", description: "Migration is now running on Lambda", variant: "success" });
+    },
+    onError: (error: any) => {
+      toast({ title: "Failed to start migration", description: error.message, variant: "destructive" });
+    },
+  });
 
   const handleExportLogs = async () => {
     setExporting(true);
@@ -95,6 +124,14 @@ export function ObservabilityPage() {
           </div>
           <div className="flex gap-2">
             <Button
+              size="sm"
+              onClick={() => navigate("/migrations/new")}
+              className="bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-700 hover:to-indigo-700"
+            >
+              <Zap className="mr-2 h-4 w-4" />
+              New Migration
+            </Button>
+            <Button
               variant="outline"
               size="sm"
               onClick={handleExportLogs}
@@ -109,6 +146,7 @@ export function ObservabilityPage() {
             </Button>
             <Button
               size="sm"
+              variant="outline"
               onClick={() => setShowMetrics(!showMetrics)}
             >
               <BarChart className="mr-2 h-4 w-4" />
@@ -128,6 +166,20 @@ export function ObservabilityPage() {
               {metrics?.migrations.total || 0}
             </div>
             <p className="text-xs text-muted-foreground mt-1">All time</p>
+          </CardContent>
+        </Card>
+
+        <Card className="border-border/70 shadow-sm">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-lg">Pending</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-3xl font-semibold text-amber-600">
+              {pendingMigrations.length}
+            </div>
+            <p className="text-xs text-muted-foreground mt-1">
+              Ready to start
+            </p>
           </CardContent>
         </Card>
 
@@ -171,6 +223,43 @@ export function ObservabilityPage() {
           </CardContent>
         </Card>
       </div>
+
+      {latestPendingMigration && (
+        <Card className="border-violet-500/50 bg-gradient-to-br from-violet-50/50 to-indigo-50/50 dark:from-violet-950/20 dark:to-indigo-950/20 shadow-sm">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-violet-900 dark:text-violet-100">
+              <Zap className="h-5 w-5 text-violet-600" />
+              Ready to Start
+            </CardTitle>
+            <CardDescription>
+              Latest pending migration ready for Lambda execution
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="font-semibold text-foreground">{latestPendingMigration.job_name}</p>
+                <p className="text-sm text-muted-foreground mt-1">
+                  ID: {latestPendingMigration.id} • Created {new Date(latestPendingMigration.created_at).toLocaleDateString()}
+                </p>
+              </div>
+              <Button
+                size="sm"
+                onClick={() => startMigrationMutation.mutate(latestPendingMigration.id)}
+                disabled={startMigrationMutation.isPending}
+                className="bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-700 hover:to-indigo-700"
+              >
+                {startMigrationMutation.isPending ? (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                ) : (
+                  <Play className="mr-2 h-4 w-4" />
+                )}
+                Start Migration
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {showMetrics && (
         <Card className="border-border/70 shadow-sm">
