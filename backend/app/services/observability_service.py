@@ -305,3 +305,6 @@ class ObservabilityService:
             self._logger.error(message)
         else:
             current_app.logger.error(message)
+
+# Module-level instance
+observability_service = ObservabilityService()
