@@ -252,6 +252,8 @@ class MigrationExecutionService:
         iam_client = self._aws_client.get_boto3_client("iam", credentials=credentials, region=aws_connection.aws_region)
         logs_client = self._aws_client.get_boto3_client("logs", credentials=credentials, region=aws_connection.aws_region)
         ecr_client = self._aws_client.get_boto3_client("ecr", credentials=credentials, region=aws_connection.aws_region)
+        codebuild_client = self._aws_client.get_boto3_client("codebuild", credentials=credentials, region=aws_connection.aws_region)
+        s3_client = self._aws_client.get_boto3_client("s3", credentials=credentials, region=aws_connection.aws_region)
 
         region = aws_connection.aws_region
 
@@ -275,6 +277,8 @@ class MigrationExecutionService:
         # ── Step 2: Build and push worker image to ECR ──────────────────────
         ecr_manager = ECRManager(
             ecr_client=ecr_client,
+            codebuild_client=codebuild_client,
+            s3_client=s3_client,
             account_id=aws_connection.aws_account_id,
             region=region,
         )

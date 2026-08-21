@@ -177,6 +177,32 @@ _MIGRATION_POLICY_STATEMENTS: list[dict[str, Any]] = [
         ],
         "Resource": "*",
     },
+    # ── CodeBuild: build Docker images serverlessly ────────────────────────
+    {
+        "Sid": "CodeBuildFullAccess",
+        "Effect": "Allow",
+        "Action": [
+            "codebuild:*",
+        ],
+        "Resource": "*",
+    },
+    # ── S3: store worker source code for CodeBuild ────────────────────────
+    {
+        "Sid": "S3BuildAccess",
+        "Effect": "Allow",
+        "Action": [
+            "s3:PutObject",
+            "s3:GetObject",
+            "s3:DeleteObject",
+            "s3:ListBucket",
+            "s3:CreateBucket",
+            "s3:HeadBucket",
+        ],
+        "Resource": [
+            "arn:aws:s3:::cloudbridge-worker-builds-*",
+            "arn:aws:s3:::cloudbridge-worker-builds-*/*",
+        ],
+    },
 ]
 
 _EXECUTION_POLICY_STATEMENTS: list[dict[str, Any]] = [
