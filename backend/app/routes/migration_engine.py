@@ -3,7 +3,7 @@ import threading
 
 from flask import Blueprint, jsonify, request, current_app
 
-from app.extensions import db
+from app.extensions import db, socketio
 from app.middleware.auth import login_required
 from app.models.migration import MigrationJob, MigrationStatus
 from app.models.migration_checkpoint import MigrationCheckpoint
@@ -42,12 +42,10 @@ def start_migration():
         
         # Trigger background execution
         app_instance = current_app._get_current_object()
-        thread = threading.Thread(
-            target=lambda_migration_service.execute_migration_background,
-            args=(app_instance, lambda_migration.id, migration_id, lambda_migration.aws_connection_id),
-            daemon=True
+        socketio.start_background_task(
+            lambda_migration_service.execute_migration_background,
+            app_instance, lambda_migration.id, migration_id, lambda_migration.aws_connection_id
         )
-        thread.start()
 
         return jsonify({
             "migration_id": migration.id,
@@ -144,12 +142,10 @@ def retry_migration():
         effective_aws_connection_id = (
             lambda_migration.aws_connection_id if lambda_migration else migration.aws_connection_id
         )
-        thread = threading.Thread(
-            target=lambda_migration_service.execute_migration_background,
-            args=(app_instance, lambda_migration.id if lambda_migration else None, migration.id, effective_aws_connection_id),
-            daemon=True
+        socketio.start_background_task(
+            lambda_migration_service.execute_migration_background,
+            app_instance, lambda_migration.id if lambda_migration else None, migration.id, effective_aws_connection_id
         )
-        thread.start()
 
         return jsonify({"migration_id": migration.id, "status": MigrationStatus.QUEUED, "message": "Migration retry with Lambda queued."}), 202
     except Exception as e:

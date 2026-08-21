@@ -49,6 +49,7 @@ from app.models.migration import MigrationJob, MigrationStatus
 from app.models.lambda_migration import LambdaMigration, LambdaMigrationStatus, LambdaChunk
 from app.exceptions.migration import MigrationError, lambda_execution_error, lambda_validation_error
 from app.services.websocket_service import websocket_service
+from app.services.observability_service import observability_service
 from app.utils.aws_client import AWSClient
 
 logger = logging.getLogger(__name__)
@@ -245,6 +246,14 @@ class LambdaMigrationService:
             },
         )
 
+        observability_service.log_audit_event(
+            event_type="MIGRATION_STARTED",
+            event_category="MIGRATION",
+            event_description=f"Lambda migration {migration.id} started",
+            migration_id=migration.id,
+            aws_connection_id=aws_connection.id,
+        )
+
         return lambda_migration
 
     def execute_migration_background(
@@ -287,6 +296,14 @@ class LambdaMigrationService:
                             "error_message": str(exc),
                             "message": str(exc),
                         },
+                    )
+                    observability_service.log_audit_event(
+                        event_type="MIGRATION_FAILED",
+                        event_category="MIGRATION",
+                        event_description=f"Lambda migration failed: {str(exc)}",
+                        migration_id=migration_id,
+                        aws_connection_id=aws_connection_id,
+                        severity="ERROR",
                     )
 
     def _do_execute(
@@ -356,6 +373,14 @@ class LambdaMigrationService:
         websocket_service.broadcast_migration_update(
             migration.id,
             {"status": MigrationStatus.COMPLETED, "message": "Migration completed successfully"},
+        )
+
+        observability_service.log_audit_event(
+            event_type="MIGRATION_COMPLETED",
+            event_category="MIGRATION",
+            event_description=f"Lambda migration {migration.id} completed successfully",
+            migration_id=migration.id,
+            aws_connection_id=aws_connection_id,
         )
 
     def _validate_databases(
@@ -631,10 +656,11 @@ class LambdaMigrationService:
 
                 if total > 0 and completed + failed == 0 and time.time() - start_time >= 15:
                     for chunk in db_chunks:
-                        chunk.status = "COMPLETED"
+                        chunk.status = "FAILED"
                         chunk.completed_at = datetime.utcnow()
-                    completed = total
+                    failed = total
                     db.session.commit()
+                    raise lambda_execution_error("Migration chunks timed out with no progress after 15 seconds")
 
             lambda_migration.chunks_completed = completed
             lambda_migration.chunks_failed = failed

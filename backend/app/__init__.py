@@ -84,7 +84,7 @@ def register_websocket_handlers(app: Flask) -> None:
     # Ensure CORS origins is a list for socketio
     if isinstance(cors_origins, str):
         cors_origins = [origin.strip() for origin in cors_origins.split(",")]
-    socketio.init_app(app, cors_allowed_origins=cors_origins, async_mode="threading")
+    socketio.init_app(app, cors_allowed_origins=cors_origins)
 
     socketio.on("connect")(handle_connect)
     socketio.on("disconnect")(handle_disconnect)
