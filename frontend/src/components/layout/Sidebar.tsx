@@ -1,4 +1,4 @@
-import { ChevronLeft, ChevronRight, ClipboardCheck, Cloud, Database, LayoutDashboard, Server, Activity, GitCompare, Settings, ShieldCheck, Zap, BarChart3, RotateCcw, User } from "lucide-react";
+import { ChevronLeft, ChevronRight, ClipboardCheck, Cloud, Database, LayoutDashboard, Server, GitCompare, Settings, ShieldCheck, Zap, BarChart3, RotateCcw, User, Layers } from "lucide-react";
 import { useEffect, type ReactNode } from "react";
 import { NavLink } from "react-router-dom";
 
@@ -14,7 +14,7 @@ const navigationItems = [
   { label: "Rollback", href: "/rollback", icon: RotateCcw, category: "Data", color: "text-orange-500" },
   { label: "Databases", href: "/database-configs", icon: Server, category: "Infrastructure", color: "text-cyan-500" },
   { label: "AWS Connections", href: "/aws-connections", icon: Cloud, category: "Infrastructure", color: "text-indigo-500" },
-  { label: "ECS Tasks", href: "/ecs", icon: Activity, category: "Infrastructure", color: "text-pink-500" },
+  { label: "Lambda Functions", href: "/observability", icon: Layers, category: "Infrastructure", color: "text-pink-500" },
   { label: "Pre-flight", href: "/preflight", icon: ClipboardCheck, category: "Infrastructure", color: "text-teal-500" },
   { label: "Observability", href: "/observability", icon: BarChart3, category: "Monitoring", color: "text-purple-500" },
 ];

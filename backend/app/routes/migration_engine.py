@@ -1,4 +1,5 @@
 from datetime import datetime
+import threading
 
 from flask import Blueprint, jsonify, request, current_app
 
@@ -6,9 +7,11 @@ from app.extensions import db
 from app.middleware.auth import login_required
 from app.models.migration import MigrationJob, MigrationStatus
 from app.models.migration_checkpoint import MigrationCheckpoint
-from app.workers.manager import worker_manager
+from app.models.lambda_migration import LambdaMigration
+from app.services.lambda_migration_service import LambdaMigrationService
 
 migration_engine_bp = Blueprint("migration_engine", __name__, url_prefix="/migration-engine")
+lambda_migration_service = LambdaMigrationService()
 
 
 @migration_engine_bp.post("/start")
@@ -16,6 +19,8 @@ migration_engine_bp = Blueprint("migration_engine", __name__, url_prefix="/migra
 def start_migration():
     payload = request.get_json(silent=True) or {}
     migration_id = payload.get("migration_id")
+    aws_connection_id = payload.get("aws_connection_id")
+    
     migration = MigrationJob.query.get(migration_id)
     if migration is None:
         return jsonify({"error": {"message": "Migration job was not found."}}), 404
@@ -23,24 +28,33 @@ def start_migration():
     if migration.status in {MigrationStatus.RUNNING, MigrationStatus.COMPLETED, MigrationStatus.CANCELLED}:
         return jsonify({"error": {"message": f"Migration cannot be started from {migration.status}."}}), 409
 
-    migration.status = MigrationStatus.QUEUED
-    migration.progress_percent = 0.0
-    migration.retry_count = 0
-    migration.started_at = datetime.utcnow()
-    db.session.commit()
+    try:
+        # Prepare Lambda migration
+        lambda_migration = lambda_migration_service.prepare_migration(
+            migration_id=migration_id,
+            aws_connection_id=aws_connection_id
+        )
+        
+        # Trigger background execution
+        app_instance = current_app._get_current_object()
+        thread = threading.Thread(
+            target=lambda_migration_service.execute_migration_background,
+            args=(app_instance, lambda_migration.id, migration_id, migration.aws_connection_id),
+            daemon=True
+        )
+        thread.start()
 
-    # Trigger actual background thread worker
-    app_instance = current_app._get_current_object()
-    if not worker_manager.start_worker(app_instance, migration.id):
-        return jsonify({"error": {"message": "Migration worker is already running."}}), 409
-
-    return jsonify({
-        "migration_id": migration.id,
-        "status": MigrationStatus.QUEUED,
-        "message": "Migration started.",
-        "checkpoint_support": True,
-        "retry_support": True,
-    }), 200
+        return jsonify({
+            "migration_id": migration.id,
+            "lambda_migration_id": lambda_migration.id,
+            "status": MigrationStatus.RUNNING,
+            "message": "Migration started with Lambda execution.",
+            "architecture": "lambda",
+            "chunk_support": True,
+            "retry_support": True,
+        }), 200
+    except Exception as e:
+        return jsonify({"error": {"message": str(e)}}), 500
 
 
 @migration_engine_bp.post("/checkpoint")
@@ -74,13 +88,8 @@ def pause_migration():
     if migration is None:
         return jsonify({"error": {"message": "Migration job was not found."}}), 404
 
-    migration.status = MigrationStatus.PAUSED
-    db.session.commit()
-
-    # Pause background worker
-    worker_manager.pause_worker(migration.id)
-
-    return jsonify({"migration_id": migration.id, "status": migration.status, "message": "Migration paused."}), 200
+    # Lambda migrations don't support pause - chunks run independently
+    return jsonify({"error": {"message": "Pause not supported in Lambda architecture. Chunks run independently."}}), 400
 
 
 @migration_engine_bp.post("/resume")
@@ -92,20 +101,14 @@ def resume_migration():
     if migration is None:
         return jsonify({"error": {"message": "Migration job was not found."}}), 404
 
-    migration.status = MigrationStatus.RUNNING
-    db.session.commit()
-
-    # Resume background worker
-    app_instance = current_app._get_current_object()
-    worker_manager.resume_worker(app_instance, migration.id)
-
-    return jsonify({"migration_id": migration.id, "status": migration.status, "message": "Migration resumed."}), 200
+    # Lambda migrations don't support resume - chunks run independently
+    return jsonify({"error": {"message": "Resume not supported in Lambda architecture. Chunks run independently."}}), 400
 
 
 @migration_engine_bp.post("/retry")
 @login_required
 def retry_migration():
-    """Retry a failed job from its latest durable checkpoint."""
+    """Retry a failed migration by re-executing Lambda workflow."""
     payload = request.get_json(silent=True) or {}
     migration = MigrationJob.query.get(payload.get("migration_id"))
     if migration is None:
@@ -113,14 +116,36 @@ def retry_migration():
     if migration.status != MigrationStatus.FAILED:
         return jsonify({"error": {"message": "Only failed migrations can be retried."}}), 409
 
-    migration.status = MigrationStatus.QUEUED
-    migration.error_message = None
-    migration.retry_count = 0
-    db.session.commit()
-    app_instance = current_app._get_current_object()
-    if not worker_manager.retry_worker(app_instance, migration.id):
-        return jsonify({"error": {"message": "Migration worker is already running."}}), 409
-    return jsonify({"migration_id": migration.id, "status": MigrationStatus.QUEUED, "message": "Migration retry queued."}), 202
+    try:
+        # Reset migration state
+        migration.status = MigrationStatus.QUEUED
+        migration.error_message = None
+        migration.retry_count = (migration.retry_count or 0) + 1
+        migration.progress_percent = 0.0
+        migration.rows_migrated = 0
+        db.session.commit()
+
+        # Get Lambda migration record
+        lambda_migration = LambdaMigration.query.filter_by(migration_id=migration.id).first()
+        if lambda_migration:
+            lambda_migration.status = "PENDING"
+            lambda_migration.chunks_completed = 0
+            lambda_migration.chunks_failed = 0
+            lambda_migration.error_message = None
+            db.session.commit()
+
+        # Trigger Lambda retry
+        app_instance = current_app._get_current_object()
+        thread = threading.Thread(
+            target=lambda_migration_service.execute_migration_background,
+            args=(app_instance, lambda_migration.id if lambda_migration else None, migration.id, migration.aws_connection_id),
+            daemon=True
+        )
+        thread.start()
+
+        return jsonify({"migration_id": migration.id, "status": MigrationStatus.QUEUED, "message": "Migration retry with Lambda queued."}), 202
+    except Exception as e:
+        return jsonify({"error": {"message": str(e)}}), 500
 
 
 @migration_engine_bp.post("/cancel")
@@ -136,8 +161,11 @@ def cancel_migration():
     migration.completed_at = None
     db.session.commit()
 
-    # Cancel background worker
-    worker_manager.cancel_worker(migration.id)
+    # Cancel Lambda migration if exists
+    lambda_migration = LambdaMigration.query.filter_by(migration_id=migration.id).first()
+    if lambda_migration:
+        lambda_migration.status = "CANCELLED"
+        db.session.commit()
 
     return jsonify({"migration_id": migration.id, "status": migration.status, "message": "Migration cancelled."}), 200
 
@@ -149,6 +177,9 @@ def migration_status(migration_id: int):
     if migration is None:
         return jsonify({"error": {"message": "Migration job was not found."}}), 404
 
+    # Get Lambda migration details if exists
+    lambda_migration = LambdaMigration.query.filter_by(migration_id=migration_id).first()
+    
     checkpoints = MigrationCheckpoint.query.filter_by(migration_id=migration_id).order_by(MigrationCheckpoint.created_at.desc()).all()
     checkpoint_list = [{
         "id": cp.id,
@@ -159,7 +190,7 @@ def migration_status(migration_id: int):
         "created_at": cp.created_at.isoformat()
     } for cp in checkpoints]
 
-    return jsonify({
+    response = {
         "migration_id": migration.id,
         "status": migration.status,
         "progress_percent": migration.progress_percent,
@@ -172,17 +203,33 @@ def migration_status(migration_id: int):
         "error_message": migration.error_message,
         "started_at": migration.started_at.isoformat() if migration.started_at else None,
         "completed_at": migration.completed_at.isoformat() if migration.completed_at else None,
-        "checkpoints": checkpoint_list
-    }), 200
+        "checkpoints": checkpoint_list,
+        "architecture": "lambda",
+    }
+    
+    # Add Lambda-specific details
+    if lambda_migration:
+        response.update({
+            "lambda_migration_id": lambda_migration.id,
+            "lambda_status": lambda_migration.status.value if lambda_migration.status else None,
+            "chunks_created": lambda_migration.chunks_created,
+            "chunks_completed": lambda_migration.chunks_completed,
+            "chunks_failed": lambda_migration.chunks_failed,
+            "chunks_total": lambda_migration.chunks_total,
+            "current_stage": lambda_migration.current_stage,
+            "orchestrator_arn": lambda_migration.orchestrator_arn,
+            "worker_arn": lambda_migration.worker_arn,
+        })
+
+    return jsonify(response), 200
 
 
 @migration_engine_bp.post("/status-update")
 def update_migration_status():
-    """Internal endpoint called by the ECS worker to update migration progress.
+    """Internal endpoint called by Lambda functions to update migration progress.
 
-    No auth required — the worker runs inside the customer's VPC and the
-    endpoint is only reachable from within the CloudBridge infrastructure.
-    In production, add a shared secret or IP restriction.
+    No auth required — Lambda functions run with IAM permissions.
+    In production, add a shared secret or IAM-based authentication.
     """
     payload = request.get_json(silent=True) or {}
     migration_id = payload.get("migration_id")
@@ -205,6 +252,16 @@ def update_migration_status():
         migration.progress_percent = 100.0
     if status == "FAILED":
         migration.completed_at = datetime.utcnow()
+
+    # Update Lambda migration record if exists
+    lambda_migration = LambdaMigration.query.filter_by(migration_id=migration_id).first()
+    if lambda_migration:
+        if "chunks_completed" in payload:
+            lambda_migration.chunks_completed = payload["chunks_completed"]
+        if "chunks_failed" in payload:
+            lambda_migration.chunks_failed = payload["chunks_failed"]
+        if "current_stage" in payload:
+            lambda_migration.current_stage = payload["current_stage"]
 
     db.session.commit()
 

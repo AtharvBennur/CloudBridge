@@ -173,7 +173,7 @@ export function DashboardPage() {
             </div>
             <div className="rounded-xl border bg-background/50 px-3 py-1.5 text-xs font-medium text-foreground flex items-center gap-1.5 hover:border-violet-400/50 hover:bg-violet-500/5 transition-all duration-200">
               <Zap className="h-3.5 w-3.5 text-violet-500" />
-              CDC Replication Ready
+              Lambda Architecture Active
             </div>
           </div>
         </div>
