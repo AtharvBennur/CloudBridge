@@ -141,20 +141,17 @@ class AWSConnectionService:
                 f"is registered for account {connection.aws_account_id}."
             )
 
-        # The CloudFormation stack outputs three roles; only the Migration role is
-        # meant to be assumed by CloudBridge via sts:AssumeRole. The Execution and
-        # Task roles are for ECS Fargate and their trust policies do NOT allow the
-        # control-plane account to assume them. Reject them early with a clear
-        # message so the user pastes the correct ARN.
+        # The CloudFormation stack outputs multiple roles; only the cross-account
+        # migration role is meant to be assumed by CloudBridge via sts:AssumeRole.
+        # The Lambda execution role is used internally by Lambda functions.
         role_name_match = re.search(r":role/([^/]+)$", register_request.role_arn)
         if role_name_match:
             role_name = role_name_match.group(1)
-            if role_name in ("CloudBridgeExecutionRole", "CloudBridgeTaskRole"):
+            if role_name == "CloudBridgeLambdaExecutionRole":
                 raise AWSConnectionValidationError(
-                    f"The ARN points to {role_name}, which is the ECS Fargate "
-                    f"{'execution' if role_name == 'CloudBridgeExecutionRole' else 'task'} role. "
-                    f"CloudBridge needs the MigrationRoleArn output from the "
-                    f"CloudFormation stack (role name: CloudBridgeMigrationRole)."
+                    "The ARN points to CloudBridgeLambdaExecutionRole, which is the "
+                    "Lambda runtime role. CloudBridge needs the MigrationRoleArn output "
+                    "from the CloudFormation stack (role name: CloudBridgeMigrationRole)."
                 )
 
         connection.role_arn = register_request.role_arn

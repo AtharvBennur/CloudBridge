@@ -11,7 +11,15 @@ Parameters:
   CloudBridgeAPIURL:
     Type: String
     Description: The CloudBridge backend API URL (e.g., https://cloudbridge-2-a0fp.onrender.com)
-  
+
+  ExternalId:
+    Type: String
+    Description: External ID supplied by CloudBridge for cross-account role assumption
+
+  CloudBridgeControlPlaneAccountId:
+    Type: String
+    Description: AWS account ID of the CloudBridge control plane that assumes the migration role
+
   DatabaseEncryptionKey:
     Type: String
     Default: alias/aws/rds
@@ -22,11 +30,11 @@ Resources:
   # IAM ROLES
   # ============================================================
   
-  CloudBridgeMigrationRole:
+  CloudBridgeLambdaExecutionRole:
     Type: AWS::IAM::Role
     Properties:
-      RoleName: CloudBridgeMigrationRole
-      Description: Lambda execution role for CloudBridge migration operations
+      RoleName: CloudBridgeLambdaExecutionRole
+      Description: Runtime role for CloudBridge Lambda migration functions
       AssumeRolePolicyDocument:
         Version: '2012-10-17'
         Statement:
@@ -37,11 +45,10 @@ Resources:
       ManagedPolicyArns:
         - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
       Policies:
-        - PolicyName: CloudBridgeMigrationPolicy
+        - PolicyName: CloudBridgeLambdaExecutionPolicy
           PolicyDocument:
             Version: '2012-10-17'
             Statement:
-              # RDS/Database connectivity
               - Sid: RDSConnectivity
                 Effect: Allow
                 Action:
@@ -49,24 +56,22 @@ Resources:
                   - rds:DescribeDBClusters
                   - rds:ListTagsForResource
                 Resource: '*'
-              
-              # Secrets Manager for credentials
               - Sid: SecretsManagerAccess
                 Effect: Allow
                 Action:
                   - secretsmanager:GetSecretValue
                   - secretsmanager:DescribeSecret
+                  - secretsmanager:CreateSecret
+                  - secretsmanager:UpdateSecret
+                  - secretsmanager:PutSecretValue
+                  - secretsmanager:TagResource
                 Resource: '*'
-              
-              # KMS for decryption
               - Sid: KMSDecrypt
                 Effect: Allow
                 Action:
                   - kms:Decrypt
                   - kms:DescribeKey
-                Resource: !Ref DatabaseEncryptionKey
-              
-              # CloudWatch Logs
+                Resource: '*'
               - Sid: CloudWatchLogs
                 Effect: Allow
                 Action:
@@ -74,8 +79,6 @@ Resources:
                   - logs:CreateLogStream
                   - logs:PutLogEvents
                 Resource: !Sub 'arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/cloudbridge-*'
-              
-              # SQS for chunk processing
               - Sid: SQSAccess
                 Effect: Allow
                 Action:
@@ -84,8 +87,6 @@ Resources:
                   - sqs:DeleteMessage
                   - sqs:GetQueueAttributes
                 Resource: !GetAtt MigrationChunkQueue.Arn
-              
-              # DynamoDB for migration state
               - Sid: DynamoDBAccess
                 Effect: Allow
                 Action:
@@ -97,16 +98,12 @@ Resources:
                   - dynamodb:DeleteItem
                 Resource:
                   - !GetAtt MigrationMetadataTable.Arn
-                  - !Sub '${MigrationMetadataTable.Arn}/*'
-              
-              # Lambda invocation for chunk processing
+                  - !Sub '${MigrationMetadataTable.Arn}/index/*'
               - Sid: LambdaInvocation
                 Effect: Allow
                 Action:
                   - lambda:InvokeFunction
-                Resource: !GetAtt MigrationWorkerLambda.Arn
-              
-              # EC2 for VPC access if needed
+                Resource: !Sub 'arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:cloudbridge-migration-worker'
               - Sid: EC2NetworkAccess
                 Effect: Allow
                 Action:
@@ -124,6 +121,99 @@ Resources:
           Value: !Ref Environment
         - Key: Purpose
           Value: LambdaMigrationExecution
+
+  CloudBridgeMigrationRole:
+    Type: AWS::IAM::Role
+    DependsOn:
+      - MigrationMetadataTable
+      - MigrationChunkQueue
+      - CloudBridgeLambdaExecutionRole
+    Properties:
+      RoleName: CloudBridgeMigrationRole
+      Description: Cross-account role assumed by CloudBridge to orchestrate Lambda migrations
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              AWS: !Sub 'arn:aws:iam::${CloudBridgeControlPlaneAccountId}:root'
+            Action: sts:AssumeRole
+            Condition:
+              StringEquals:
+                sts:ExternalId: !Ref ExternalId
+      Policies:
+        - PolicyName: CloudBridgeCrossAccountMigrationPolicy
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Sid: STSIdentity
+                Effect: Allow
+                Action:
+                  - sts:GetCallerIdentity
+                Resource: '*'
+              - Sid: LambdaInvoke
+                Effect: Allow
+                Action:
+                  - lambda:InvokeFunction
+                  - lambda:GetFunction
+                  - lambda:GetFunctionConfiguration
+                Resource: !Sub 'arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:cloudbridge-*'
+              - Sid: SecretsManagerAccess
+                Effect: Allow
+                Action:
+                  - secretsmanager:GetSecretValue
+                  - secretsmanager:DescribeSecret
+                  - secretsmanager:CreateSecret
+                  - secretsmanager:UpdateSecret
+                  - secretsmanager:PutSecretValue
+                  - secretsmanager:DeleteSecret
+                  - secretsmanager:TagResource
+                Resource: '*'
+              - Sid: RDSReadOnly
+                Effect: Allow
+                Action:
+                  - rds:Describe*
+                Resource: '*'
+              - Sid: DynamoDBAccess
+                Effect: Allow
+                Action:
+                  - dynamodb:PutItem
+                  - dynamodb:GetItem
+                  - dynamodb:UpdateItem
+                  - dynamodb:Query
+                  - dynamodb:Scan
+                Resource:
+                  - !GetAtt MigrationMetadataTable.Arn
+                  - !Sub '${MigrationMetadataTable.Arn}/index/*'
+              - Sid: SQSAccess
+                Effect: Allow
+                Action:
+                  - sqs:SendMessage
+                  - sqs:ReceiveMessage
+                  - sqs:GetQueueAttributes
+                Resource: !GetAtt MigrationChunkQueue.Arn
+              - Sid: CloudWatchLogsRead
+                Effect: Allow
+                Action:
+                  - logs:DescribeLogStreams
+                  - logs:GetLogEvents
+                  - logs:FilterLogEvents
+                Resource: !Sub 'arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/cloudbridge-*'
+              - Sid: PassLambdaExecutionRole
+                Effect: Allow
+                Action:
+                  - iam:PassRole
+                Resource: !GetAtt CloudBridgeLambdaExecutionRole.Arn
+                Condition:
+                  StringEquals:
+                    iam:PassedToService: lambda.amazonaws.com
+      Tags:
+        - Key: ManagedBy
+          Value: CloudBridge
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: Purpose
+          Value: LambdaMigrationOrchestration
 
   # ============================================================
   # DYNAMODB TABLES
@@ -225,8 +315,8 @@ Resources:
       FunctionName: cloudbridge-migration-orchestrator
       Description: Orchestrates migration workflow - schema discovery, chunking, and coordination
       Runtime: python3.12
-      Handler: orchestrator.lambda_handler
-      Role: !GetAtt CloudBridgeMigrationRole.Arn
+      Handler: index.lambda_handler
+      Role: !GetAtt CloudBridgeLambdaExecutionRole.Arn
       Timeout: 900
       MemorySize: 512
       Environment:
@@ -355,8 +445,8 @@ Resources:
       FunctionName: cloudbridge-migration-worker
       Description: Processes individual migration chunks - data extraction, transformation, loading
       Runtime: python3.12
-      Handler: worker.lambda_handler
-      Role: !GetAtt CloudBridgeMigrationRole.Arn
+      Handler: index.lambda_handler
+      Role: !GetAtt CloudBridgeLambdaExecutionRole.Arn
       Timeout: 900
       MemorySize: 1024
       Environment:
@@ -486,8 +576,8 @@ Resources:
       FunctionName: cloudbridge-validation
       Description: Validates database connectivity and permissions for source/destination
       Runtime: python3.12
-      Handler: validator.lambda_handler
-      Role: !GetAtt CloudBridgeMigrationRole.Arn
+      Handler: index.lambda_handler
+      Role: !GetAtt CloudBridgeLambdaExecutionRole.Arn
       Timeout: 120
       MemorySize: 256
       Environment:
@@ -642,67 +732,45 @@ Resources:
         - Key: Environment
           Value: !Ref Environment
 
-  # ============================================================
-  # OUTPUTS
-  # ============================================================
-  
+Outputs:
+  MigrationRoleArn:
+    Description: Paste this ARN into CloudBridge as the Role ARN for your AWS connection
+    Value: !GetAtt CloudBridgeMigrationRole.Arn
+    Export:
+      Name: !Sub '${AWS::StackName}-MigrationRoleArn'
+
   MigrationOrchestratorLambdaArn:
     Description: ARN of the Migration Orchestrator Lambda function
     Value: !GetAtt MigrationOrchestratorLambda.Arn
     Export:
       Name: !Sub '${AWS::StackName}-OrchestratorArn'
-  
+
   MigrationWorkerLambdaArn:
     Description: ARN of the Migration Worker Lambda function
     Value: !GetAtt MigrationWorkerLambda.Arn
     Export:
       Name: !Sub '${AWS::StackName}-WorkerArn'
-  
+
   ValidationLambdaArn:
     Description: ARN of the Validation Lambda function
     Value: !GetAtt ValidationLambda.Arn
     Export:
       Name: !Sub '${AWS::StackName}-ValidationArn'
-  
+
   MigrationMetadataTableName:
     Description: Name of the DynamoDB table for migration metadata
     Value: !Ref MigrationMetadataTable
     Export:
       Name: !Sub '${AWS::StackName}-MetadataTable'
-  
+
   MigrationChunkQueueUrl:
     Description: URL of the SQS queue for migration chunks
     Value: !Ref MigrationChunkQueue
     Export:
       Name: !Sub '${AWS::StackName}-ChunkQueueUrl'
-  
-  CloudBridgeMigrationRoleArn:
-    Description: ARN of the CloudBridge Migration Lambda execution role
-    Value: !GetAtt CloudBridgeMigrationRole.Arn
-    Export:
-      Name: !Sub '${AWS::StackName}-RoleArn'
 
-Outputs:
-  MigrationOrchestratorLambdaArn:
-    Description: ARN of the Migration Orchestrator Lambda function
-    Value: !GetAtt MigrationOrchestratorLambda.Arn
-  
-  MigrationWorkerLambdaArn:
-    Description: ARN of the Migration Worker Lambda function
-    Value: !GetAtt MigrationWorkerLambda.Arn
-  
-  ValidationLambdaArn:
-    Description: ARN of the Validation Lambda function
-    Value: !GetAtt ValidationLambda.Arn
-  
-  MigrationMetadataTableName:
-    Description: Name of the DynamoDB table for migration metadata
-    Value: !Ref MigrationMetadataTable
-  
-  MigrationChunkQueueUrl:
-    Description: URL of the SQS queue for migration chunks
-    Value: !Ref MigrationChunkQueue
-  
-  CloudBridgeMigrationRoleArn:
-    Description: ARN of the CloudBridge Migration Lambda execution role
-    Value: !GetAtt CloudBridgeMigrationRole.Arn
+  LambdaExecutionRoleArn:
+    Description: Runtime IAM role used by CloudBridge Lambda functions (do not register in CloudBridge)
+    Value: !GetAtt CloudBridgeLambdaExecutionRole.Arn
+    Export:
+      Name: !Sub '${AWS::StackName}-LambdaExecutionRoleArn'

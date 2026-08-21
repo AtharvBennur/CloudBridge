@@ -159,3 +159,77 @@ def test_register_role_arn_rejects_invalid_arn() -> None:
         headers=_auth_headers(),
     )
     assert register_response.status_code == 400
+
+
+def test_cloudformation_template_is_lambda_based() -> None:
+    import json
+
+    app = create_app("testing")
+    app.config["CLOUDBRIDGE_AWS_ACCOUNT_ID"] = "999999999999"
+    client = app.test_client()
+
+    create_response = client.post(
+        "/aws-connections",
+        json={
+            "aws_account_id": "123456789012",
+            "aws_region": "us-east-1",
+        },
+        headers=_auth_headers(),
+    )
+    connection_id = create_response.get_json()["id"]
+
+    response = client.get(
+        f"/aws-connections/{connection_id}/cloudformation-template",
+        headers=_auth_headers(),
+    )
+    assert response.status_code == 200
+    payload = response.get_json()
+    assert payload["architecture"] == "lambda"
+    assert "cloudbridge-lambda" in payload["download_filename"]
+
+    template = payload["template"]
+    json.dumps(template)
+
+    resources = template["Resources"]
+    assert "CloudBridgeMigrationRole" in resources
+    assert "CloudBridgeLambdaExecutionRole" in resources
+    assert "MigrationOrchestratorLambda" in resources
+    assert "MigrationWorkerLambda" in resources
+    assert "ValidationLambda" in resources
+    assert "CloudBridgeExecutionRole" not in resources
+    assert "CloudBridgeTaskRole" not in resources
+
+    migration_role = resources["CloudBridgeMigrationRole"]["Properties"]
+    assume_service = migration_role["AssumeRolePolicyDocument"]["Statement"][0]["Principal"]["AWS"]
+    assert "999999999999" in assume_service
+
+    lambda_role = resources["CloudBridgeLambdaExecutionRole"]["Properties"]
+    lambda_trust = lambda_role["AssumeRolePolicyDocument"]["Statement"][0]["Principal"]["Service"]
+    assert lambda_trust == "lambda.amazonaws.com"
+
+    orchestrator = resources["MigrationOrchestratorLambda"]["Properties"]
+    assert orchestrator["Handler"] == "index.lambda_handler"
+    assert orchestrator["Runtime"] == "python3.12"
+
+
+def test_register_role_arn_rejects_lambda_execution_role() -> None:
+    app = create_app("testing")
+    client = app.test_client()
+
+    create_response = client.post(
+        "/aws-connections",
+        json={
+            "aws_account_id": "123456789012",
+            "aws_region": "us-east-1",
+        },
+        headers=_auth_headers(),
+    )
+    connection_id = create_response.get_json()["id"]
+
+    register_response = client.post(
+        f"/aws-connections/{connection_id}/register-role-arn",
+        json={"role_arn": "arn:aws:iam::123456789012:role/CloudBridgeLambdaExecutionRole"},
+        headers=_auth_headers(),
+    )
+    assert register_response.status_code == 400
+    assert "CloudBridgeMigrationRole" in register_response.get_json()["error"]["message"]

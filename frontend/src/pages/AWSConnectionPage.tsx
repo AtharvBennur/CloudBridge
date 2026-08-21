@@ -421,7 +421,7 @@ export function AWSConnectionPage() {
                     <li>Open AWS Console &rarr; CloudFormation &rarr; Create Stack</li>
                     <li>Upload the template and create the stack</li>
                     <li>Wait for the stack status to show <strong>CREATE_COMPLETE</strong></li>
-                    <li>Copy the <strong>RoleArn</strong> from the stack Outputs tab</li>
+                    <li>Copy the <strong>MigrationRoleArn</strong> from the stack Outputs tab</li>
                     <li>Click "Continue" and paste the Role ARN</li>
                   </ol>
                 </div>
@@ -618,7 +618,7 @@ export function AWSConnectionPage() {
                           }}
                         />
                         <p className="text-[11px] text-muted-foreground">
-                          Paste the <span className="font-mono font-medium text-foreground">MigrationRoleArn</span> output from the CloudFormation stack (not the Execution or Task role).
+                          Paste the <span className="font-mono font-medium text-foreground">MigrationRoleArn</span> output from the CloudFormation stack (not the Lambda execution role).
                         </p>
                         <div className="flex gap-2">
                           <Button

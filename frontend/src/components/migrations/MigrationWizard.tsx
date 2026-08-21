@@ -267,7 +267,7 @@ export function MigrationWizard({ onSubmit, isSubmitting }: MigrationWizardProps
                       Advanced Defaults
                     </h4>
                     <p className="mt-1 text-xs text-muted-foreground">
-                      The migration engine will use ECS Fargate workers for execution. Checkpoints are created automatically every chunk batch for rollback safety.
+                      The migration engine runs on AWS Lambda for serverless execution. Checkpoints are created automatically every chunk batch for rollback safety.
                     </p>
                   </div>
                 </>

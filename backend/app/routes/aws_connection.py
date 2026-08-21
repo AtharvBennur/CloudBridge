@@ -156,6 +156,5 @@ def register_role_arn(aws_connection_id: int):
 @login_required
 def get_cloudformation_template(aws_connection_id: int):
     """Generate a downloadable CloudFormation template for customer IAM setup."""
-    include_ecs = request.args.get("include_ecs_task_role", "true").lower() == "true"
-    response = cloudformation_service.generate_template(aws_connection_id, include_ecs_task_role=include_ecs)
+    response = cloudformation_service.generate_template(aws_connection_id)
     return jsonify(response), 200
