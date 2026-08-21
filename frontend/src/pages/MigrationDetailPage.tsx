@@ -14,7 +14,7 @@ Migration Service
 */
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ArrowLeft, Database, CalendarDays, FolderKanban, Play, Pause, RotateCcw, X, Terminal } from "lucide-react";
+import { ArrowLeft, Database, CalendarDays, FolderKanban, Play, Pause, RotateCcw, X, Terminal, Layers, Zap, CheckCircle2, AlertCircle } from "lucide-react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useEffect, useState } from "react";
 
@@ -25,6 +25,7 @@ import { migrationService } from "@/services/migrationService";
 import { useToast } from "@/components/ui/toast";
 import { websocketService } from "@/services/websocketService";
 import { env } from "@/lib/env";
+import { ProgressBar } from "@/components/ui/ProgressBar";
 
 function formatDate(value: string) {
   return new Date(value).toLocaleString();
@@ -70,6 +71,7 @@ export function MigrationDetailPage() {
     queryKey: ["migration", migrationId],
     queryFn: () => migrationService.getById(migrationId),
     enabled: Number.isFinite(migrationId),
+    refetchInterval: 2000, // Poll every 2 seconds when migration is running
   });
 
   const startMutation = useMutation({
@@ -245,6 +247,104 @@ export function MigrationDetailPage() {
                 <p>{formatDate(migration.updated_at)}</p>
               </div>
             </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Layers className="h-5 w-5 text-violet-500" />
+              Lambda Execution Status
+            </CardTitle>
+            <CardDescription>Real-time Lambda migration progress and chunk status</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="flex items-center gap-2 mb-4">
+              <Zap className="h-4 w-4 text-violet-500" />
+              <span className="text-sm font-medium text-foreground">Architecture: Lambda</span>
+            </div>
+
+            {migration.status === "RUNNING" && (
+              <div className="space-y-3">
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-muted-foreground">Progress</span>
+                  <span className="font-medium">{migration.progress_percent?.toFixed(1) || 0}%</span>
+                </div>
+                <ProgressBar value={migration.progress_percent || 0} className="h-2" />
+                <div className="flex items-center justify-between text-xs text-muted-foreground">
+                  <span>{migration.rows_migrated?.toLocaleString() || 0} rows migrated</span>
+                  <span>{migration.total_rows?.toLocaleString() || 0} total rows</span>
+                </div>
+              </div>
+            )}
+
+            {migration.lambda_migration_id && (
+              <div className="space-y-3 pt-3 border-t">
+                <div className="grid grid-cols-2 gap-3 text-sm">
+                  <div className="rounded-lg border p-3">
+                    <p className="text-xs text-muted-foreground">Lambda Migration ID</p>
+                    <p className="font-medium text-foreground">{migration.lambda_migration_id}</p>
+                  </div>
+                  <div className="rounded-lg border p-3">
+                    <p className="text-xs text-muted-foreground">Lambda Status</p>
+                    <p className="font-medium text-foreground capitalize">{migration.lambda_status || "Unknown"}</p>
+                  </div>
+                </div>
+
+                {migration.chunks_total !== undefined && migration.chunks_total > 0 && (
+                  <div className="space-y-2">
+                    <p className="text-sm font-medium text-foreground">Chunk Progress</p>
+                    <div className="grid grid-cols-3 gap-2 text-sm">
+                      <div className="rounded-lg border p-2 text-center">
+                        <p className="text-xs text-muted-foreground">Created</p>
+                        <p className="font-medium text-blue-600">{migration.chunks_created || 0}</p>
+                      </div>
+                      <div className="rounded-lg border p-2 text-center">
+                        <p className="text-xs text-muted-foreground">Completed</p>
+                        <p className="font-medium text-green-600">{migration.chunks_completed || 0}</p>
+                      </div>
+                      <div className="rounded-lg border p-2 text-center">
+                        <p className="text-xs text-muted-foreground">Failed</p>
+                        <p className="font-medium text-red-600">{migration.chunks_failed || 0}</p>
+                      </div>
+                    </div>
+                    <ProgressBar 
+                      value={migration.chunks_total > 0 ? ((migration.chunks_completed || 0) / migration.chunks_total) * 100 : 0} 
+                      className="h-1.5"
+                    />
+                  </div>
+                )}
+
+                {migration.current_stage && (
+                  <div className="flex items-center gap-2 text-sm">
+                    <CheckCircle2 className="h-4 w-4 text-violet-500" />
+                    <span className="text-muted-foreground">Current Stage:</span>
+                    <span className="font-medium text-foreground capitalize">{migration.current_stage}</span>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {migration.status === "PENDING" && (
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <AlertCircle className="h-4 w-4 text-amber-500" />
+                <span>Click "Start" to begin Lambda migration execution</span>
+              </div>
+            )}
+
+            {migration.status === "COMPLETED" && (
+              <div className="flex items-center gap-2 text-sm text-green-600">
+                <CheckCircle2 className="h-4 w-4" />
+                <span>Migration completed successfully</span>
+              </div>
+            )}
+
+            {migration.status === "FAILED" && migration.error_message && (
+              <div className="rounded-lg border border-destructive/50 bg-destructive/10 p-3 text-sm text-destructive">
+                <p className="font-medium mb-1">Error</p>
+                <p className="text-xs">{migration.error_message}</p>
+              </div>
+            )}
           </CardContent>
         </Card>
 
