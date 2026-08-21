@@ -59,18 +59,6 @@ class WebSocketService {
     }
   }
 
-  joinECSTask(taskId: number): void {
-    if (this.socket) {
-      this.socket.emit("join_ecs_task", { task_id: taskId });
-    }
-  }
-
-  leaveECSTask(taskId: number): void {
-    if (this.socket) {
-      this.socket.emit("leave_ecs_task", { task_id: taskId });
-    }
-  }
-
   onMigrationProgress(callback: (data: any) => void): void {
     if (this.socket) {
       this.socket.on("migration_progress", callback);
@@ -104,12 +92,6 @@ class WebSocketService {
   onApprovalRequired(callback: (data: any) => void): void {
     if (this.socket) {
       this.socket.on("approval_required", callback);
-    }
-  }
-
-  onECSTaskStatus(callback: (data: any) => void): void {
-    if (this.socket) {
-      this.socket.on("ecs_task_status", callback);
     }
   }
 

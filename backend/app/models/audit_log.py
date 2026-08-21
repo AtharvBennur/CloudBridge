@@ -76,7 +76,6 @@ class AuditLog(db.Model):
     migration_id = db.Column(db.Integer, db.ForeignKey("migration_jobs.id"), nullable=True, index=True)
     aws_connection_id = db.Column(db.Integer, db.ForeignKey("aws_connections.id"), nullable=True, index=True)
     database_config_id = db.Column(db.Integer, db.ForeignKey("database_configs.id"), nullable=True, index=True)
-    ecs_task_id = db.Column(db.Integer, db.ForeignKey("ecs_tasks.id"), nullable=True, index=True)
     
     # User context
     user_id = db.Column(db.String(255), nullable=True, index=True)
