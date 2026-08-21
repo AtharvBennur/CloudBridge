@@ -48,6 +48,13 @@ class AWSConnection(db.Model):
     external_id = db.Column(db.String(64), nullable=False, unique=True, default=lambda: str(uuid4()))
     connection_status = db.Column(db.String(32), nullable=False, default=AWSConnectionStatus.PENDING)
     last_validated_at = db.Column(db.DateTime, nullable=True)
+    cloudformation_stack_name = db.Column(db.String(255), nullable=False, default="CloudBridgecf")
+    orchestrator_lambda_arn = db.Column(db.String(512), nullable=True)
+    worker_lambda_arn = db.Column(db.String(512), nullable=True)
+    validation_lambda_arn = db.Column(db.String(512), nullable=True)
+    dynamodb_table_name = db.Column(db.String(255), nullable=True)
+    infrastructure_discovered_at = db.Column(db.DateTime, nullable=True)
+    infrastructure_last_verified_at = db.Column(db.DateTime, nullable=True)
     created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow, server_default=text("CURRENT_TIMESTAMP"))
     updated_at = db.Column(
         db.DateTime,

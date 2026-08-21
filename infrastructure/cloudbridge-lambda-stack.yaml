@@ -89,6 +89,7 @@ Resources:
             Version: '2012-10-17'
             Statement:
               - {Effect: Allow, Action: [lambda:InvokeFunction], Resource: [!GetAtt Orchestrator.Arn, !GetAtt Worker.Arn, !GetAtt Validator.Arn]}
+              - {Effect: Allow, Action: [cloudformation:DescribeStacks], Resource: '*'}
               - {Effect: Allow, Action: [secretsmanager:CreateSecret, secretsmanager:PutSecretValue, secretsmanager:GetSecretValue, secretsmanager:DescribeSecret], Resource: '*'}
 Outputs:
   MigrationRoleArn: {Value: !GetAtt CloudBridgeMigrationRole.Arn}

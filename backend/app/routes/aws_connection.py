@@ -24,11 +24,13 @@ from app.exceptions.aws_connection import (
 from app.middleware.auth import login_required
 from app.services.aws_connection_service import AWSConnectionService
 from app.services.cloudformation_service import CloudFormationService
+from app.services.infrastructure_discovery_service import InfrastructureDiscoveryService, InfrastructureDiscoveryError
 
 
 aws_connection_bp = Blueprint("aws_connection", __name__, url_prefix="/aws-connections")
 aws_connection_service = AWSConnectionService()
 cloudformation_service = CloudFormationService()
+infrastructure_discovery_service = InfrastructureDiscoveryService()
 
 
 @aws_connection_bp.errorhandler(AWSConnectionValidationError)
@@ -158,3 +160,14 @@ def get_cloudformation_template(aws_connection_id: int):
     """Generate a downloadable CloudFormation template for customer IAM setup."""
     response = cloudformation_service.generate_template(aws_connection_id)
     return jsonify(response), 200
+
+
+@aws_connection_bp.post('/<int:aws_connection_id>/infrastructure/discover')
+@login_required
+def discover_infrastructure(aws_connection_id: int):
+    payload = request.get_json(silent=True) or {}
+    try:
+        connection = infrastructure_discovery_service.discover(aws_connection_id, payload.get("stack_name"))
+    except InfrastructureDiscoveryError as exc:
+        return jsonify({"error": {"message": str(exc)}}), 422
+    return jsonify({"status": "READY", "aws_connection_id": connection.id, "account_id": connection.aws_account_id, "region": connection.aws_region, "stack_name": connection.cloudformation_stack_name, "orchestrator_lambda_arn": connection.orchestrator_lambda_arn, "worker_lambda_arn": connection.worker_lambda_arn, "validation_lambda_arn": connection.validation_lambda_arn, "dynamodb_table_name": connection.dynamodb_table_name}), 200

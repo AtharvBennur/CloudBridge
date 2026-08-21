@@ -197,6 +197,8 @@ class AWSConnectionResponse:
     last_validated_at: str | None
     created_at: str
     updated_at: str
+    cloudformation_stack_name: str
+    infrastructure_status: str
 
     def to_dict(self) -> dict[str, Any]:
         """Convert the response object into a JSON-safe dictionary."""
@@ -210,6 +212,8 @@ class AWSConnectionResponse:
             "last_validated_at": self.last_validated_at or "",
             "created_at": self.created_at,
             "updated_at": self.updated_at,
+            "cloudformation_stack_name": self.cloudformation_stack_name,
+            "infrastructure_status": self.infrastructure_status,
         }
 
     @classmethod
@@ -225,6 +229,8 @@ class AWSConnectionResponse:
             last_validated_at=connection.last_validated_at.isoformat() if connection.last_validated_at else None,
             created_at=connection.created_at.isoformat() if connection.created_at else "",
             updated_at=connection.updated_at.isoformat() if connection.updated_at else "",
+            cloudformation_stack_name=connection.cloudformation_stack_name or "CloudBridgecf",
+            infrastructure_status="READY" if connection.orchestrator_lambda_arn and connection.dynamodb_table_name else "NOT_DISCOVERED",
         )
 
 

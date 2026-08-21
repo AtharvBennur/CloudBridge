@@ -27,6 +27,8 @@ export interface AWSConnection {
   last_validated_at: string;
   created_at: string;
   updated_at: string;
+  cloudformation_stack_name: string;
+  infrastructure_status: string;
 }
 
 export interface CreateAWSConnectionPayload {
@@ -121,6 +123,10 @@ export const awsConnectionService = {
 
   async getCloudformationTemplate(id: number): Promise<any> {
     const response = await apiClient.get<any>(`/aws-connections/${id}/cloudformation-template`);
+    return response.data;
+  },
+  async discoverInfrastructure(id: number): Promise<any> {
+    const response = await apiClient.post<any>(`/aws-connections/${id}/infrastructure/discover`, {});
     return response.data;
   },
 };

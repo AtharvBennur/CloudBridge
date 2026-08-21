@@ -683,6 +683,7 @@ export function AWSConnectionPage() {
                     Last validated: {new Date(connection.last_validated_at).toLocaleString()}
                   </div>
                 )}
+                <div className="mt-2 text-xs text-muted-foreground">Infrastructure: <span className={connection.infrastructure_status === "READY" ? "text-emerald-600 font-medium" : "text-amber-600 font-medium"}>{connection.infrastructure_status}</span> · Stack: {connection.cloudformation_stack_name || "CloudBridgecf"}</div>
 
                 {/* Dynamic Action Response Feed */}
                 {res && <ConnectionResultCard result={res} />}
@@ -725,6 +726,9 @@ export function AWSConnectionPage() {
                     >
                       <Download className="mr-1.5 h-3.5 w-3.5" />
                       CloudFormation
+                    </Button>
+                    <Button onClick={() => awsConnectionService.discoverInfrastructure(connection.id).then(() => queryClient.invalidateQueries({ queryKey: ["aws-connections"] }))} variant="outline" size="sm" disabled={connection.connection_status !== "CONNECTED"}>
+                      <RefreshCw className="mr-1.5 h-3.5 w-3.5" /> Refresh Infrastructure
                     </Button>
                   </div>
 

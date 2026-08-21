@@ -99,6 +99,18 @@ class LambdaMigrationService:
         return function_name
 
     def _resolve_lambda_arns(self, aws_connection: AWSConnection) -> dict[str, str]:
+        if aws_connection.orchestrator_lambda_arn and aws_connection.worker_lambda_arn and aws_connection.validation_lambda_arn:
+            return {"orchestrator": aws_connection.orchestrator_lambda_arn, "worker": aws_connection.worker_lambda_arn, "validation": aws_connection.validation_lambda_arn}
+        # Production resources must be discovered per AWS connection. Environment
+        # values are retained only for explicit local-development fallback.
+        if current_app.config.get("ENV_NAME") != "development":
+            from app.services.infrastructure_discovery_service import InfrastructureDiscoveryService, InfrastructureDiscoveryError
+            try:
+                InfrastructureDiscoveryService(self._aws_client).discover(aws_connection.id)
+            except InfrastructureDiscoveryError as exc:
+                raise MigrationError(str(exc)) from exc
+            db.session.refresh(aws_connection)
+            return {"orchestrator": aws_connection.orchestrator_lambda_arn, "worker": aws_connection.worker_lambda_arn, "validation": aws_connection.validation_lambda_arn}
         return {
             "orchestrator": self._resolve_lambda_arn(
                 aws_connection, ORCHESTRATOR_FUNCTION, "CLOUDBRIDGE_ORCHESTRATOR_LAMBDA_ARN"
