@@ -46,22 +46,6 @@ def handle_leave_migration(data):
         emit("left_migration", {"migration_id": migration_id, "message": f"Left migration {migration_id} room"})
 
 
-def handle_join_ecs_task(data):
-    """Handle client joining an ECS task room."""
-    task_id = data.get("task_id")
-    if task_id:
-        websocket_service.join_ecs_task_room(task_id)
-        emit("joined_ecs_task", {"task_id": task_id, "message": f"Joined ECS task {task_id} room"})
-
-
-def handle_leave_ecs_task(data):
-    """Handle client leaving an ECS task room."""
-    task_id = data.get("task_id")
-    if task_id:
-        websocket_service.leave_ecs_task_room(task_id)
-        emit("left_ecs_task", {"task_id": task_id, "message": f"Left ECS task {task_id} room"})
-
-
 def handle_ping():
     """Handle ping from client."""
     emit("pong", {"timestamp": "pong"})

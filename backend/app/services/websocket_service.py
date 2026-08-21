@@ -148,29 +148,5 @@ class WebSocketService:
         socketio.emit(event_type, event_data, broadcast=True)
         _get_logger().info(f"Broadcasted global event: {event_type}")
 
-    @staticmethod
-    def broadcast_ecs_task_update(task_id: int, data: dict[str, Any]) -> None:
-        room = f"ecs_task_{task_id}"
-        event_data = {
-            "event_type": "ecs_task_update",
-            "task_id": task_id,
-            "timestamp": datetime.utcnow().isoformat(),
-            "data": data,
-        }
-        socketio.emit("ecs_task_update", event_data, room=room)
-        _get_logger().info(f"Broadcasted ECS task update to room: {room}")
-
-    @staticmethod
-    def join_ecs_task_room(task_id: int) -> None:
-        room = f"ecs_task_{task_id}"
-        join_room(room)
-        _get_logger().info(f"Client joined ECS task room: {room}")
-
-    @staticmethod
-    def leave_ecs_task_room(task_id: int) -> None:
-        room = f"ecs_task_{task_id}"
-        leave_room(room)
-        _get_logger().info(f"Client left ECS task room: {room}")
-
 
 websocket_service = WebSocketService()

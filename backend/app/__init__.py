@@ -12,7 +12,7 @@ from app.models.migration_checkpoint import MigrationCheckpoint
 from app.models.cdc_config import CDCConfig
 from app.models.cdc_event import CDCEvent
 from app.models.schema_snapshot import SchemaSnapshot, SchemaDriftEvent
-from app.models.ecs_task import ECSTask
+from app.models.lambda_migration import LambdaMigration, LambdaChunk
 from app.models.audit_log import AuditLog
 from app.models.notification import NotificationConfig, Notification
 from app.routes.auth import auth_bp
@@ -25,12 +25,10 @@ from app.routes.preflight import preflight_bp
 from app.routes.cdc import cdc_bp
 from app.routes.schema_drift import schema_drift_bp
 from app.routes.schema_approval import schema_approval_bp
-from app.routes.ecs import ecs_bp
 from app.routes.observability import observability_bp
 from app.routes.notification import notification_bp
 from app.routes.rollback import rollback_bp
-from app.routes.websocket import handle_connect, handle_disconnect, handle_join_migration, handle_leave_migration, handle_join_ecs_task, handle_leave_ecs_task, handle_ping
-from app.routes.worker import worker_bp
+from app.routes.websocket import handle_connect, handle_disconnect, handle_join_migration, handle_leave_migration, handle_ping
 
 
 def create_app(config_name: str | None = None) -> Flask:
@@ -75,11 +73,9 @@ def register_blueprints(app: Flask) -> None:
     app.register_blueprint(cdc_bp)
     app.register_blueprint(schema_drift_bp)
     app.register_blueprint(schema_approval_bp)
-    app.register_blueprint(ecs_bp)
     app.register_blueprint(observability_bp)
     app.register_blueprint(notification_bp)
     app.register_blueprint(rollback_bp)
-    app.register_blueprint(worker_bp)
 
 
 def register_websocket_handlers(app: Flask) -> None:
@@ -94,6 +90,4 @@ def register_websocket_handlers(app: Flask) -> None:
     socketio.on("disconnect")(handle_disconnect)
     socketio.on("join_migration")(handle_join_migration)
     socketio.on("leave_migration")(handle_leave_migration)
-    socketio.on("join_ecs_task")(handle_join_ecs_task)
-    socketio.on("leave_ecs_task")(handle_leave_ecs_task)
     socketio.on("ping")(handle_ping)

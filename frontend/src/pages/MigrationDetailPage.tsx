@@ -76,7 +76,7 @@ export function MigrationDetailPage() {
     mutationFn: () => migrationService.start(migrationId, migrationQuery.data?.aws_connection_id ?? undefined),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["migration", migrationId] });
-      toast({ title: "Migration started", description: "Migration is now running on ECS", variant: "success" });
+      toast({ title: "Migration started", description: "Migration is now running on Lambda", variant: "success" });
     },
     onError: (error: any) => {
       toast({ title: "Failed to start migration", description: error.message, variant: "destructive" });
@@ -173,35 +173,14 @@ export function MigrationDetailPage() {
               </Button>
             )}
             {migration.status === "RUNNING" && (
-              <>
-                <Button 
-                  size="sm" 
-                  variant="outline"
-                  onClick={() => pauseMutation.mutate()}
-                  disabled={pauseMutation.isPending}
-                >
-                  <Pause className="h-4 w-4 mr-2" />
-                  Pause
-                </Button>
-                <Button 
-                  size="sm" 
-                  variant="destructive"
-                  onClick={() => cancelMutation.mutate()}
-                  disabled={cancelMutation.isPending}
-                >
-                  <X className="h-4 w-4 mr-2" />
-                  Cancel
-                </Button>
-              </>
-            )}
-            {migration.status === "PAUSED" && (
               <Button 
                 size="sm" 
-                onClick={() => resumeMutation.mutate()}
-                disabled={resumeMutation.isPending}
+                variant="destructive"
+                onClick={() => cancelMutation.mutate()}
+                disabled={cancelMutation.isPending}
               >
-                <Play className="h-4 w-4 mr-2" />
-                Resume
+                <X className="h-4 w-4 mr-2" />
+                Cancel
               </Button>
             )}
             {migration.status === "FAILED" && (
@@ -272,7 +251,7 @@ export function MigrationDetailPage() {
         <Card>
           <CardHeader>
             <CardTitle>Migration Logs</CardTitle>
-            <CardDescription>Real-time logs from the ECS worker</CardDescription>
+            <CardDescription>Real-time logs from Lambda functions</CardDescription>
           </CardHeader>
           <CardContent>
             <div className="flex items-center gap-2 mb-4">

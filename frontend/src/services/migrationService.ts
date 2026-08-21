@@ -32,6 +32,17 @@ export interface MigrationJob {
   error_message: string | null;
   created_at: string;
   updated_at: string;
+  // Lambda-specific fields
+  architecture?: string;
+  lambda_migration_id?: number;
+  lambda_status?: string;
+  chunks_created?: number;
+  chunks_completed?: number;
+  chunks_failed?: number;
+  chunks_total?: number;
+  current_stage?: string;
+  orchestrator_arn?: string;
+  worker_arn?: string;
   // Legacy fields for backward compatibility
   source_database?: string;
   destination_database?: string;
@@ -83,7 +94,7 @@ export const migrationService = {
   },
 
   async start(migrationId: number, awsConnectionId?: number): Promise<any> {
-    const response = await apiClient.post<any>("/ecs/start-migration", { 
+    const response = await apiClient.post<any>("/migration-engine/start", { 
       migration_id: migrationId,
       aws_connection_id: awsConnectionId
     });
@@ -91,52 +102,31 @@ export const migrationService = {
   },
 
   async pause(migrationId: number): Promise<any> {
-    // First get the ECS task for this migration, then pause it
-    const response = await apiClient.get<any>(`/ecs/tasks?migration_id=${migrationId}`);
-    const tasks = response.data;
-    if (tasks.length === 0) throw new Error("No ECS task found for this migration");
-    const taskId = tasks[0].id;
-    const pauseResponse = await apiClient.post<any>(`/ecs/tasks/${taskId}/pause`);
-    return pauseResponse.data;
+    // Lambda architecture doesn't support pause - chunks run independently
+    throw new Error("Pause is not supported in Lambda architecture. Chunks run independently.");
   },
 
   async resume(migrationId: number): Promise<any> {
-    // First get the ECS task for this migration, then resume it
-    const response = await apiClient.get<any>(`/ecs/tasks?migration_id=${migrationId}`);
-    const tasks = response.data;
-    if (tasks.length === 0) throw new Error("No ECS task found for this migration");
-    const taskId = tasks[0].id;
-    const resumeResponse = await apiClient.post<any>(`/ecs/tasks/${taskId}/resume`);
-    return resumeResponse.data;
+    // Lambda architecture doesn't support resume - chunks run independently
+    throw new Error("Resume is not supported in Lambda architecture. Chunks run independently.");
   },
 
   async cancel(migrationId: number): Promise<any> {
-    // First get the ECS task for this migration, then cancel it
-    const response = await apiClient.get<any>(`/ecs/tasks?migration_id=${migrationId}`);
-    const tasks = response.data;
-    if (tasks.length === 0) throw new Error("No ECS task found for this migration");
-    const taskId = tasks[0].id;
-    const cancelResponse = await apiClient.post<any>(`/ecs/tasks/${taskId}/cancel`);
-    return cancelResponse.data;
+    const response = await apiClient.post<any>("/migration-engine/cancel", { 
+      migration_id: migrationId
+    });
+    return response.data;
   },
 
   async retry(migrationId: number): Promise<any> {
-    // First get the ECS task for this migration, then retry it
-    const response = await apiClient.get<any>(`/ecs/tasks?migration_id=${migrationId}`);
-    const tasks = response.data;
-    if (tasks.length === 0) throw new Error("No ECS task found for this migration");
-    const taskId = tasks[0].id;
-    const retryResponse = await apiClient.post<any>(`/ecs/tasks/${taskId}/retry`);
-    return retryResponse.data;
+    const response = await apiClient.post<any>("/migration-engine/retry", { 
+      migration_id: migrationId
+    });
+    return response.data;
   },
 
   async getStatus(migrationId: number): Promise<any> {
-    // Get ECS task status instead of migration-engine status
-    const response = await apiClient.get<any>(`/ecs/tasks?migration_id=${migrationId}`);
-    const tasks = response.data;
-    if (tasks.length === 0) throw new Error("No ECS task found for this migration");
-    const taskId = tasks[0].id;
-    const statusResponse = await apiClient.get<any>(`/ecs/tasks/${taskId}/status`);
-    return statusResponse.data;
+    const response = await apiClient.get<any>(`/migration-engine/${migrationId}/status`);
+    return response.data;
   },
 };
