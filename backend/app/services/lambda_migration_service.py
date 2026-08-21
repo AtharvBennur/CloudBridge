@@ -47,7 +47,7 @@ from app.models.aws_connection import AWSConnection
 from app.models.database_config import DatabaseConfig
 from app.models.migration import MigrationJob, MigrationStatus
 from app.models.lambda_migration import LambdaMigration, LambdaMigrationStatus, LambdaChunk
-from app.exceptions.migration_errors import MigrationError, lambda_execution_error, lambda_validation_error
+from app.exceptions.migration import MigrationError, lambda_execution_error, lambda_validation_error
 from app.services.websocket_service import websocket_service
 from app.utils.aws_client import AWSClient
 

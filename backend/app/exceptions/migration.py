@@ -32,3 +32,32 @@ class MigrationNotFoundError(MigrationError):
 
 class MigrationIntegrityError(MigrationError):
     """Raised when a referenced foreign key does not exist."""
+
+
+class LambdaExecutionError(MigrationError):
+    """Raised when Lambda function execution fails."""
+
+    def __init__(self, message: str, details: dict = None) -> None:
+        super().__init__(message)
+        self.message = message
+        self.details = details or {}
+
+
+class LambdaValidationError(MigrationError):
+    """Raised when Lambda validation fails."""
+
+    def __init__(self, message: str, validation_errors: list = None) -> None:
+        super().__init__(message)
+        self.message = message
+        self.validation_errors = validation_errors or []
+
+
+# Convenience functions for creating lambda errors
+def lambda_execution_error(message: str, details: dict = None) -> LambdaExecutionError:
+    """Create a Lambda execution error."""
+    return LambdaExecutionError(message, details)
+
+
+def lambda_validation_error(message: str, validation_errors: list = None) -> LambdaValidationError:
+    """Create a Lambda validation error."""
+    return LambdaValidationError(message, validation_errors)
