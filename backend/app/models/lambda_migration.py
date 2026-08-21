@@ -28,6 +28,7 @@ class LambdaMigration(db.Model):
     status = db.Column(db.Enum(LambdaMigrationStatus), default=LambdaMigrationStatus.PENDING, nullable=False)
     orchestrator_arn = db.Column(db.String(255))
     worker_arn = db.Column(db.String(255))
+    orchestrator_request_id = db.Column(db.String(100))
     
     # Chunk tracking
     chunks_created = db.Column(db.Integer, default=0)
@@ -66,6 +67,7 @@ class LambdaMigration(db.Model):
             "status": self.status.value if self.status else None,
             "orchestrator_arn": self.orchestrator_arn,
             "worker_arn": self.worker_arn,
+            "orchestrator_request_id": self.orchestrator_request_id,
             "chunks_created": self.chunks_created,
             "chunks_completed": self.chunks_completed,
             "chunks_failed": self.chunks_failed,

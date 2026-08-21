@@ -53,6 +53,7 @@ def serialize_migration(migration: MigrationJob) -> dict[str, Any]:
                 "current_stage": lambda_migration.current_stage,
                 "orchestrator_arn": lambda_migration.orchestrator_arn,
                 "worker_arn": lambda_migration.worker_arn,
+                "lambda_request_id": lambda_migration.orchestrator_request_id,
             }
         )
         if lambda_migration.error_message and not data.get("error_message"):

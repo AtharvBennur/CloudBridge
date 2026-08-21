@@ -33,10 +33,14 @@ services:
         value: https://cloudbridge-2-a0fp.onrender.com,https://cloudbridge-frontend.onrender.com,http://localhost:5173,http://localhost:5174
       - key: LOG_LEVEL
         value: INFO
-      - key: ECS_CLUSTER_NAME
-        value: cloudbridge-migration-cluster
-      - key: CLOUDWATCH_LOG_GROUP
-        value: /aws/ecs/cloudbridge-migration-workers
+      - key: CLOUDBRIDGE_ORCHESTRATOR_LAMBDA_ARN
+        sync: false
+      - key: CLOUDBRIDGE_WORKER_LAMBDA_ARN
+        sync: false
+      - key: CLOUDBRIDGE_VALIDATION_LAMBDA_ARN
+        sync: false
+      - key: CLOUDBRIDGE_DYNAMODB_TABLE
+        sync: false
       - key: SECRET_KEY
         sync: false
       - key: WORKER_API_SECRET

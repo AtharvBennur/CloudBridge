@@ -1,5 +1,5 @@
 from datetime import datetime
-import threading
+import hmac
 
 from flask import Blueprint, jsonify, request, current_app
 
@@ -40,18 +40,15 @@ def start_migration():
             aws_connection_id=aws_connection_id
         )
         
-        # Trigger background execution
-        app_instance = current_app._get_current_object()
-        socketio.start_background_task(
-            lambda_migration_service.execute_migration_background,
-            app_instance, lambda_migration.id, migration_id, lambda_migration.aws_connection_id
-        )
+        invocation = lambda_migration_service.launch_migration(lambda_migration)
 
         return jsonify({
             "migration_id": migration.id,
             "lambda_migration_id": lambda_migration.id,
             "status": MigrationStatus.RUNNING,
-            "message": "Migration started with Lambda execution.",
+            "message": "Lambda accepted the migration request.",
+            "lambda_function_arn": invocation["function_arn"],
+            "lambda_request_id": invocation["request_id"],
             "architecture": "lambda",
             "chunk_support": True,
             "retry_support": True,
@@ -235,6 +232,11 @@ def update_migration_status():
     No auth required — Lambda functions run with IAM permissions.
     In production, add a shared secret or IAM-based authentication.
     """
+    expected_secret = current_app.config.get("WORKER_API_SECRET", "")
+    supplied_secret = request.headers.get("X-CloudBridge-Worker-Secret", "")
+    if not expected_secret or not hmac.compare_digest(expected_secret, supplied_secret):
+        return jsonify({"error": {"message": "Unauthorized Lambda status callback."}}), 401
+
     payload = request.get_json(silent=True) or {}
     migration_id = payload.get("migration_id")
     migration = MigrationJob.query.get(migration_id)
@@ -266,6 +268,9 @@ def update_migration_status():
             lambda_migration.chunks_failed = payload["chunks_failed"]
         if "current_stage" in payload:
             lambda_migration.current_stage = payload["current_stage"]
+        if "chunks_total" in payload:
+            lambda_migration.chunks_total = int(payload["chunks_total"])
+            lambda_migration.chunks_created = int(payload["chunks_total"])
 
     db.session.commit()
 
@@ -282,3 +287,7 @@ def update_migration_status():
     )
 
     return jsonify({"message": "Status updated.", "migration_id": migration.id, "status": migration.status}), 200
+    if "total_rows" in payload:
+        migration.total_rows = int(payload["total_rows"])
+    if "current_table" in payload:
+        migration.current_table = payload["current_table"]

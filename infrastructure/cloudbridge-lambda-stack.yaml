@@ -1,783 +1,99 @@
 AWSTemplateFormatVersion: '2010-09-09'
-Description: 'CloudBridge Lambda-based Migration Platform - Complete infrastructure for serverless data migrations'
-
+Transform: AWS::Serverless-2016-10-31
+Description: CloudBridge real MySQL Lambda migration workers; deploy with sam build && sam deploy.
 Parameters:
-  Environment:
-    Type: String
-    Default: production
-    AllowedValues: [development, staging, production]
-    Description: Environment name for resource tagging
-  
-  CloudBridgeAPIURL:
-    Type: String
-    Description: The CloudBridge backend API URL (e.g., https://cloudbridge-2-a0fp.onrender.com)
-
-  ExternalId:
-    Type: String
-    Description: External ID supplied by CloudBridge for cross-account role assumption
-
-  CloudBridgeControlPlaneAccountId:
-    Type: String
-    Description: AWS account ID of the CloudBridge control plane that assumes the migration role
-
-  DatabaseEncryptionKey:
-    Type: String
-    Default: alias/aws/rds
-    Description: KMS key ID for database credential encryption
-
+  CloudBridgeAPIURL: {Type: String}
+  WorkerApiSecret: {Type: String, NoEcho: true}
+  CloudBridgeControlPlaneAccountId: {Type: String}
+  ExternalId: {Type: String, NoEcho: true}
 Resources:
-  # ============================================================
-  # IAM ROLES
-  # ============================================================
-  
-  CloudBridgeLambdaExecutionRole:
-    Type: AWS::IAM::Role
-    Properties:
-      RoleName: CloudBridgeLambdaExecutionRole
-      Description: Runtime role for CloudBridge Lambda migration functions
-      AssumeRolePolicyDocument:
-        Version: '2012-10-17'
-        Statement:
-          - Effect: Allow
-            Principal:
-              Service: lambda.amazonaws.com
-            Action: sts:AssumeRole
-      ManagedPolicyArns:
-        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
-      Policies:
-        - PolicyName: CloudBridgeLambdaExecutionPolicy
-          PolicyDocument:
-            Version: '2012-10-17'
-            Statement:
-              - Sid: RDSConnectivity
-                Effect: Allow
-                Action:
-                  - rds:DescribeDBInstances
-                  - rds:DescribeDBClusters
-                  - rds:ListTagsForResource
-                Resource: '*'
-              - Sid: SecretsManagerAccess
-                Effect: Allow
-                Action:
-                  - secretsmanager:GetSecretValue
-                  - secretsmanager:DescribeSecret
-                  - secretsmanager:CreateSecret
-                  - secretsmanager:UpdateSecret
-                  - secretsmanager:PutSecretValue
-                  - secretsmanager:TagResource
-                Resource: '*'
-              - Sid: KMSDecrypt
-                Effect: Allow
-                Action:
-                  - kms:Decrypt
-                  - kms:DescribeKey
-                Resource: '*'
-              - Sid: CloudWatchLogs
-                Effect: Allow
-                Action:
-                  - logs:CreateLogGroup
-                  - logs:CreateLogStream
-                  - logs:PutLogEvents
-                Resource: !Sub 'arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/cloudbridge-*'
-              - Sid: SQSAccess
-                Effect: Allow
-                Action:
-                  - sqs:SendMessage
-                  - sqs:ReceiveMessage
-                  - sqs:DeleteMessage
-                  - sqs:GetQueueAttributes
-                Resource: !GetAtt MigrationChunkQueue.Arn
-              - Sid: DynamoDBAccess
-                Effect: Allow
-                Action:
-                  - dynamodb:PutItem
-                  - dynamodb:GetItem
-                  - dynamodb:UpdateItem
-                  - dynamodb:Query
-                  - dynamodb:Scan
-                  - dynamodb:DeleteItem
-                Resource:
-                  - !GetAtt MigrationMetadataTable.Arn
-                  - !Sub '${MigrationMetadataTable.Arn}/index/*'
-              - Sid: LambdaInvocation
-                Effect: Allow
-                Action:
-                  - lambda:InvokeFunction
-                Resource: !Sub 'arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:cloudbridge-migration-worker'
-              - Sid: EC2NetworkAccess
-                Effect: Allow
-                Action:
-                  - ec2:CreateNetworkInterface
-                  - ec2:DeleteNetworkInterface
-                  - ec2:DescribeNetworkInterfaces
-                  - ec2:DescribeSecurityGroups
-                  - ec2:DescribeSubnets
-                  - ec2:DescribeVpcs
-                Resource: '*'
-      Tags:
-        - Key: ManagedBy
-          Value: CloudBridge
-        - Key: Environment
-          Value: !Ref Environment
-        - Key: Purpose
-          Value: LambdaMigrationExecution
-
-  CloudBridgeMigrationRole:
-    Type: AWS::IAM::Role
-    DependsOn:
-      - MigrationMetadataTable
-      - MigrationChunkQueue
-      - CloudBridgeLambdaExecutionRole
-    Properties:
-      RoleName: CloudBridgeMigrationRole
-      Description: Cross-account role assumed by CloudBridge to orchestrate Lambda migrations
-      AssumeRolePolicyDocument:
-        Version: '2012-10-17'
-        Statement:
-          - Effect: Allow
-            Principal:
-              AWS: !Sub 'arn:aws:iam::${CloudBridgeControlPlaneAccountId}:root'
-            Action: sts:AssumeRole
-            Condition:
-              StringEquals:
-                sts:ExternalId: !Ref ExternalId
-      Policies:
-        - PolicyName: CloudBridgeCrossAccountMigrationPolicy
-          PolicyDocument:
-            Version: '2012-10-17'
-            Statement:
-              - Sid: STSIdentity
-                Effect: Allow
-                Action:
-                  - sts:GetCallerIdentity
-                Resource: '*'
-              - Sid: EC2RegionValidation
-                Effect: Allow
-                Action:
-                  - ec2:DescribeRegions
-                  - ec2:DescribeAvailabilityZones
-                Resource: '*'
-              - Sid: LambdaInvoke
-                Effect: Allow
-                Action:
-                  - lambda:InvokeFunction
-                  - lambda:GetFunction
-                  - lambda:GetFunctionConfiguration
-                Resource: !Sub 'arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:cloudbridge-*'
-              - Sid: SecretsManagerAccess
-                Effect: Allow
-                Action:
-                  - secretsmanager:GetSecretValue
-                  - secretsmanager:DescribeSecret
-                  - secretsmanager:ListSecrets
-                  - secretsmanager:CreateSecret
-                  - secretsmanager:UpdateSecret
-                  - secretsmanager:PutSecretValue
-                  - secretsmanager:DeleteSecret
-                  - secretsmanager:TagResource
-                Resource: '*'
-              - Sid: RDSReadOnly
-                Effect: Allow
-                Action:
-                  - rds:Describe*
-                Resource: '*'
-              - Sid: DynamoDBAccess
-                Effect: Allow
-                Action:
-                  - dynamodb:PutItem
-                  - dynamodb:GetItem
-                  - dynamodb:UpdateItem
-                  - dynamodb:Query
-                  - dynamodb:Scan
-                Resource:
-                  - !GetAtt MigrationMetadataTable.Arn
-                  - !Sub '${MigrationMetadataTable.Arn}/index/*'
-              - Sid: SQSAccess
-                Effect: Allow
-                Action:
-                  - sqs:SendMessage
-                  - sqs:ReceiveMessage
-                  - sqs:GetQueueAttributes
-                Resource: !GetAtt MigrationChunkQueue.Arn
-              - Sid: CloudWatchLogsRead
-                Effect: Allow
-                Action:
-                  - logs:DescribeLogStreams
-                  - logs:GetLogEvents
-                  - logs:FilterLogEvents
-                Resource: !Sub 'arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/cloudbridge-*'
-              - Sid: PassLambdaExecutionRole
-                Effect: Allow
-                Action:
-                  - iam:PassRole
-                Resource: !GetAtt CloudBridgeLambdaExecutionRole.Arn
-                Condition:
-                  StringEquals:
-                    iam:PassedToService: lambda.amazonaws.com
-      Tags:
-        - Key: ManagedBy
-          Value: CloudBridge
-        - Key: Environment
-          Value: !Ref Environment
-        - Key: Purpose
-          Value: LambdaMigrationOrchestration
-
-  # ============================================================
-  # DYNAMODB TABLES
-  # ============================================================
-  
-  MigrationMetadataTable:
+  MetadataTable:
     Type: AWS::DynamoDB::Table
     Properties:
-      TableName: cloudbridge-migration-metadata
       BillingMode: PAY_PER_REQUEST
-      AttributeDefinitions:
-        - AttributeName: migration_id
-          AttributeType: S
-        - AttributeName: chunk_id
-          AttributeType: S
-        - AttributeName: status
-          AttributeType: S
-      KeySchema:
-        - AttributeName: migration_id
-          KeyType: HASH
-        - AttributeName: chunk_id
-          KeyType: RANGE
-      GlobalSecondaryIndexes:
-        - IndexName: StatusIndex
-          KeySchema:
-            - AttributeName: status
-              KeyType: HASH
-          Projection:
-            ProjectionType: ALL
-      StreamSpecification:
-        StreamViewType: NEW_AND_OLD_IMAGES
-      Tags:
-        - Key: ManagedBy
-          Value: CloudBridge
-        - Key: Environment
-          Value: !Ref Environment
-      PointInTimeRecoverySpecification:
-        PointInTimeRecoveryEnabled: true
-
-  # ============================================================
-  # SQS QUEUES
-  # ============================================================
-  
-  MigrationChunkQueue:
+      AttributeDefinitions: [{AttributeName: migration_id, AttributeType: S}, {AttributeName: chunk_id, AttributeType: S}]
+      KeySchema: [{AttributeName: migration_id, KeyType: HASH}, {AttributeName: chunk_id, KeyType: RANGE}]
+      SSESpecification: {SSEEnabled: true}
+  ChunkDLQ:
+    Type: AWS::SQS::Queue
+    Properties: {MessageRetentionPeriod: 1209600}
+  ChunkQueue:
     Type: AWS::SQS::Queue
     Properties:
-      QueueName: cloudbridge-migration-chunks
       VisibilityTimeout: 900
-      MessageRetentionPeriod: 1209600
-      RedrivePolicy:
-        deadLetterTargetArn: !GetAtt MigrationChunkDLQ.Arn
-        maxReceiveCount: 5
-      Tags:
-        - Key: ManagedBy
-          Value: CloudBridge
-        - Key: Environment
-          Value: !Ref Environment
-  
-  MigrationChunkDLQ:
-    Type: AWS::SQS::Queue
+      RedrivePolicy: {deadLetterTargetArn: !GetAtt ChunkDLQ.Arn, maxReceiveCount: 3}
+  LambdaRole:
+    Type: AWS::IAM::Role
     Properties:
-      QueueName: cloudbridge-migration-chunks-dlq
-      MessageRetentionPeriod: 1209600
-      Tags:
-        - Key: ManagedBy
-          Value: CloudBridge
-        - Key: Environment
-          Value: !Ref Environment
-
-  # ============================================================
-  # CLOUDWATCH LOG GROUPS
-  # ============================================================
-  
-  MigrationOrchestratorLogGroup:
-    Type: AWS::Logs::LogGroup
-    Properties:
-      LogGroupName: /aws/lambda/cloudbridge-migration-orchestrator
-      RetentionInDays: 30
-  
-  MigrationWorkerLogGroup:
-    Type: AWS::Logs::LogGroup
-    Properties:
-      LogGroupName: /aws/lambda/cloudbridge-migration-worker
-      RetentionInDays: 30
-  
-  ValidationLogGroup:
-    Type: AWS::Logs::LogGroup
-    Properties:
-      LogGroupName: /aws/lambda/cloudbridge-validation
-      RetentionInDays: 30
-
-  # ============================================================
-  # LAMBDA FUNCTIONS
-  # ============================================================
-  
-  MigrationOrchestratorLambda:
-    Type: AWS::Lambda::Function
+      AssumeRolePolicyDocument: {Version: '2012-10-17', Statement: [{Effect: Allow, Principal: {Service: lambda.amazonaws.com}, Action: sts:AssumeRole}]}
+      ManagedPolicyArns: [arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole]
+      Policies:
+        - PolicyName: runtime
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - {Effect: Allow, Action: [dynamodb:GetItem, dynamodb:PutItem, dynamodb:UpdateItem, dynamodb:Query], Resource: !GetAtt MetadataTable.Arn}
+              - {Effect: Allow, Action: [sqs:SendMessage, sqs:ReceiveMessage, sqs:DeleteMessage, sqs:GetQueueAttributes], Resource: [!GetAtt ChunkQueue.Arn, !GetAtt ChunkDLQ.Arn]}
+              - {Effect: Allow, Action: [secretsmanager:GetSecretValue], Resource: '*'}
+  DependencyLayer:
+    Type: AWS::Serverless::LayerVersion
+    Properties: {LayerName: cloudbridge-mysql-dependencies, ContentUri: lambda_layer/, CompatibleRuntimes: [python3.12]}
+    Metadata: {BuildMethod: python3.12, BuildProperties: {RequirementsFile: requirements.txt}}
+  Orchestrator:
+    Type: AWS::Serverless::Function
     Properties:
       FunctionName: cloudbridge-migration-orchestrator
-      Description: Orchestrates migration workflow - schema discovery, chunking, and coordination
+      CodeUri: lambda_src/
+      Handler: app.orchestrator_handler
       Runtime: python3.12
-      Handler: index.lambda_handler
-      Role: !GetAtt CloudBridgeLambdaExecutionRole.Arn
-      Timeout: 900
-      MemorySize: 512
-      Environment:
-        Variables:
-          CLOUDBRIDGE_API_URL: !Ref CloudBridgeAPIURL
-          MIGRATION_METADATA_TABLE: !Ref MigrationMetadataTable
-          CHUNK_QUEUE_URL: !Ref MigrationChunkQueue
-          WORKER_LAMBDA_ARN: !GetAtt MigrationWorkerLambda.Arn
-          AWS_REGION: !Ref AWS::Region
-      Code:
-        ZipFile: |
-          import json
-          import os
-          import boto3
-          from typing import Dict, Any
-          
-          dynamodb = boto3.resource('dynamodb')
-          sqs = boto3.client('sqs')
-          lambda_client = boto3.client('lambda')
-          
-          TABLE_NAME = os.environ.get('MIGRATION_METADATA_TABLE')
-          QUEUE_URL = os.environ.get('CHUNK_QUEUE_URL')
-          WORKER_ARN = os.environ.get('WORKER_LAMBDA_ARN')
-          API_URL = os.environ.get('CLOUDBRIDGE_API_URL')
-          
-          table = dynamodb.Table(TABLE_NAME)
-          
-          def lambda_handler(event, context):
-              """Main orchestrator for migration workflow."""
-              print(f"Orchestrator invoked with event: {json.dumps(event)}")
-              
-              action = event.get('action')
-              migration_id = event.get('migration_id')
-              
-              if action == 'discover_schema':
-                  return discover_schema(event)
-              elif action == 'create_chunks':
-                  return create_chunks(event)
-              elif action == 'coordinate_migration':
-                  return coordinate_migration(event)
-              elif action == 'verify_migration':
-                  return verify_migration(event)
-              else:
-                  raise ValueError(f"Unknown action: {action}")
-          
-          def discover_schema(event: Dict[str, Any]) -> Dict[str, Any]:
-              """Discover source database schema."""
-              migration_id = event['migration_id']
-              source_config = event['source_config']
-              
-              print(f"Discovering schema for migration {migration_id}")
-              
-              # Store schema discovery status
-              table.update_item(
-                  Key={'migration_id': migration_id, 'chunk_id': 'schema'},
-                  UpdateExpression='SET #s = :s, discovered_at = :t',
-                  ExpressionAttributeNames={'#s': 'status'},
-                  ExpressionAttributeValues={
-                      ':s': 'DISCOVERING',
-                      ':t': context.get_remaining_time_in_millis()
-                  }
-              )
-              
-              # TODO: Implement actual schema discovery logic
-              # This would connect to source DB and extract schema
-              
-              return {
-                  'status': 'success',
-                  'migration_id': migration_id,
-                  'schema': {'tables': []}  # Placeholder
-              }
-          
-          def create_chunks(event: Dict[str, Any]) -> Dict[str, Any]:
-              """Create migration chunks based on schema and data size."""
-              migration_id = event['migration_id']
-              schema = event.get('schema', {})
-              
-              print(f"Creating chunks for migration {migration_id}")
-              
-              # TODO: Implement chunking logic
-              # Split tables into chunks based on row count
-              
-              return {
-                  'status': 'success',
-                  'migration_id': migration_id,
-                  'chunks_created': 0
-              }
-          
-          def coordinate_migration(event: Dict[str, Any]) -> Dict[str, Any]:
-              """Coordinate chunk processing through Lambda invocations."""
-              migration_id = event['migration_id']
-              
-              print(f"Coordinating migration {migration_id}")
-              
-              # TODO: Implement coordination logic
-              # Invoke worker Lambda for each chunk
-              
-              return {
-                  'status': 'success',
-                  'migration_id': migration_id
-              }
-          
-          def verify_migration(event: Dict[str, Any]) -> Dict[str, Any]:
-              """Verify migrated data integrity."""
-              migration_id = event['migration_id']
-              
-              print(f"Verifying migration {migration_id}")
-              
-              # TODO: Implement verification logic
-              # Compare source and destination row counts
-              
-              return {
-                  'status': 'success',
-                  'migration_id': migration_id,
-                  'verified': True
-              }
-      Tags:
-        - Key: ManagedBy
-          Value: CloudBridge
-        - Key: Environment
-          Value: !Ref Environment
-
-  MigrationWorkerLambda:
-    Type: AWS::Lambda::Function
-    Properties:
-      FunctionName: cloudbridge-migration-worker
-      Description: Processes individual migration chunks - data extraction, transformation, loading
-      Runtime: python3.12
-      Handler: index.lambda_handler
-      Role: !GetAtt CloudBridgeLambdaExecutionRole.Arn
+      Role: !GetAtt LambdaRole.Arn
       Timeout: 900
       MemorySize: 1024
-      Environment:
-        Variables:
-          CLOUDBRIDGE_API_URL: !Ref CloudBridgeAPIURL
-          MIGRATION_METADATA_TABLE: !Ref MigrationMetadataTable
-          AWS_REGION: !Ref AWS::Region
-      Code:
-        ZipFile: |
-          import json
-          import os
-          import boto3
-          import pymysql
-          import psycopg2
-          from typing import Dict, Any
-          
-          dynamodb = boto3.resource('dynamodb')
-          
-          TABLE_NAME = os.environ.get('MIGRATION_METADATA_TABLE')
-          API_URL = os.environ.get('CLOUDBRIDGE_API_URL')
-          
-          table = dynamodb.Table(TABLE_NAME)
-          
-          def lambda_handler(event, context):
-              """Process a single migration chunk."""
-              print(f"Worker invoked with event: {json.dumps(event)}")
-              
-              migration_id = event.get('migration_id')
-              chunk_id = event.get('chunk_id')
-              source_config = event.get('source_config')
-              dest_config = event.get('dest_config')
-              
-              if not all([migration_id, chunk_id, source_config, dest_config]):
-                  raise ValueError("Missing required parameters")
-              
-              # Update chunk status to processing
-              table.update_item(
-                  Key={'migration_id': migration_id, 'chunk_id': chunk_id},
-                  UpdateExpression='SET #s = :s, started_at = :t',
-                  ExpressionAttributeNames={'#s': 'status'},
-                  ExpressionAttributeValues={
-                      ':s': 'PROCESSING',
-                      ':t': context.get_remaining_time_in_millis()
-                  }
-              )
-              
-              try:
-                  # Process the chunk
-                  result = process_chunk(migration_id, chunk_id, source_config, dest_config)
-                  
-                  # Update chunk status to completed
-                  table.update_item(
-                      Key={'migration_id': migration_id, 'chunk_id': chunk_id},
-                      UpdateExpression='SET #s = :s, completed_at = :t, rows_migrated = :r',
-                      ExpressionAttributeNames={'#s': 'status'},
-                      ExpressionAttributeValues={
-                          ':s': 'COMPLETED',
-                          ':t': context.get_remaining_time_in_millis(),
-                          ':r': result.get('rows_migrated', 0)
-                      }
-                  )
-                  
-                  return {
-                      'status': 'success',
-                      'migration_id': migration_id,
-                      'chunk_id': chunk_id,
-                      'rows_migrated': result.get('rows_migrated', 0)
-                  }
-                  
-              except Exception as e:
-                  # Update chunk status to failed
-                  table.update_item(
-                      Key={'migration_id': migration_id, 'chunk_id': chunk_id},
-                      UpdateExpression='SET #s = :s, error = :e, failed_at = :t',
-                      ExpressionAttributeNames={'#s': 'status'},
-                      ExpressionAttributeValues={
-                          ':s': 'FAILED',
-                          ':e': str(e),
-                          ':t': context.get_remaining_time_in_millis()
-                      }
-                  )
-                  raise
-          
-          def process_chunk(migration_id: str, chunk_id: str, source_config: Dict, dest_config: Dict) -> Dict[str, Any]:
-              """Process a single chunk of data migration."""
-              print(f"Processing chunk {chunk_id} for migration {migration_id}")
-              
-              # TODO: Implement actual data migration logic
-              # 1. Connect to source database
-              # 2. Extract chunk data
-              # 3. Transform if needed
-              # 4. Load to destination
-              # 5. Return row count
-              
-              return {
-                  'rows_migrated': 0  # Placeholder
-              }
-          
-          def connect_to_mysql(config: Dict):
-              """Connect to MySQL database."""
-              return pymysql.connect(
-                  host=config['host'],
-                  port=config['port'],
-                  user=config['username'],
-                  password=config['password'],
-                  database=config['database_name']
-              )
-          
-          def connect_to_postgres(config: Dict):
-              """Connect to PostgreSQL database."""
-              return psycopg2.connect(
-                  host=config['host'],
-                  port=config['port'],
-                  user=config['username'],
-                  password=config['password'],
-                  database=config['database_name']
-              )
-      Tags:
-        - Key: ManagedBy
-          Value: CloudBridge
-        - Key: Environment
-          Value: !Ref Environment
-
-  ValidationLambda:
-    Type: AWS::Lambda::Function
+      Layers: [!Ref DependencyLayer]
+      Environment: {Variables: {MIGRATION_METADATA_TABLE: !Ref MetadataTable, CHUNK_QUEUE_URL: !Ref ChunkQueue, CLOUDBRIDGE_API_URL: !Ref CloudBridgeAPIURL, WORKER_API_SECRET: !Ref WorkerApiSecret}}
+  Worker:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: cloudbridge-migration-worker
+      CodeUri: lambda_src/
+      Handler: app.worker_handler
+      Runtime: python3.12
+      Role: !GetAtt LambdaRole.Arn
+      Timeout: 900
+      MemorySize: 2048
+      Layers: [!Ref DependencyLayer]
+      Environment: {Variables: {MIGRATION_METADATA_TABLE: !Ref MetadataTable, CHUNK_QUEUE_URL: !Ref ChunkQueue, CLOUDBRIDGE_API_URL: !Ref CloudBridgeAPIURL, WORKER_API_SECRET: !Ref WorkerApiSecret}}
+      Events: {Chunks: {Type: SQS, Properties: {Queue: !GetAtt ChunkQueue.Arn, BatchSize: 1}}}
+  Validator:
+    Type: AWS::Serverless::Function
     Properties:
       FunctionName: cloudbridge-validation
-      Description: Validates database connectivity and permissions for source/destination
+      CodeUri: lambda_src/
+      Handler: app.validation_handler
       Runtime: python3.12
-      Handler: index.lambda_handler
-      Role: !GetAtt CloudBridgeLambdaExecutionRole.Arn
+      Role: !GetAtt LambdaRole.Arn
       Timeout: 120
-      MemorySize: 256
-      Environment:
-        Variables:
-          CLOUDBRIDGE_API_URL: !Ref CloudBridgeAPIURL
-          AWS_REGION: !Ref AWS::Region
-      Code:
-        ZipFile: |
-          import json
-          import os
-          import boto3
-          import pymysql
-          import psycopg2
-          from typing import Dict, Any, Tuple
-          
-          def lambda_handler(event, context):
-              """Validate database connectivity and permissions."""
-              print(f"Validator invoked with event: {json.dumps(event)}")
-              
-              db_type = event.get('db_type')
-              config = event.get('config')
-              validation_type = event.get('validation_type', 'connectivity')
-              
-              if db_type == 'mysql':
-                  return validate_mysql(config, validation_type)
-              elif db_type == 'postgresql':
-                  return validate_postgres(config, validation_type)
-              else:
-                  raise ValueError(f"Unsupported database type: {db_type}")
-          
-          def validate_mysql(config: Dict, validation_type: str) -> Dict[str, Any]:
-              """Validate MySQL database connectivity and permissions."""
-              try:
-                  connection = pymysql.connect(
-                      host=config['host'],
-                      port=config['port'],
-                      user=config['username'],
-                      password=config['password'],
-                      database=config['database_name'],
-                      connect_timeout=10
-                  )
-                  
-                  with connection.cursor() as cursor:
-                      # Execute SELECT 1 to verify database access
-                      cursor.execute("SELECT 1")
-                      result = cursor.fetchone()
-                      
-                      if result != (1,):
-                          raise ValueError("Database query returned unexpected result")
-                      
-                      # Check permissions
-                      cursor.execute("SHOW GRANTS FOR CURRENT_USER()")
-                      grants = cursor.fetchall()
-                      
-                      # If source validation, get sample rows
-                      sample_rows = []
-                      if validation_type == 'source':
-                          cursor.execute("SHOW TABLES LIMIT 5")
-                          tables = cursor.fetchall()
-                          for table in tables[:1]:
-                              table_name = table[0]
-                              cursor.execute(f"SELECT * FROM `{table_name}` LIMIT 5")
-                              rows = cursor.fetchall()
-                              columns = [desc[0] for desc in cursor.description]
-                              sample_rows.append({
-                                  'table': table_name,
-                                  'columns': columns,
-                                  'rows': rows  # TODO: Implement PII masking
-                              })
-                  
-                  connection.close()
-                  
-                  return {
-                      'status': 'success',
-                      'db_type': 'mysql',
-                      'validation_type': validation_type,
-                      'grants': [str(grant[0]) for grant in grants],
-                      'sample_rows': sample_rows if validation_type == 'source' else None
-                  }
-                  
-              except Exception as e:
-                  return {
-                      'status': 'failed',
-                      'db_type': 'mysql',
-                      'error': str(e)
-                  }
-          
-          def validate_postgres(config: Dict, validation_type: str) -> Dict[str, Any]:
-              """Validate PostgreSQL database connectivity and permissions."""
-              try:
-                  connection = psycopg2.connect(
-                      host=config['host'],
-                      port=config['port'],
-                      user=config['username'],
-                      password=config['password'],
-                      database=config['database_name'],
-                      connect_timeout=10
-                  )
-                  
-                  with connection.cursor() as cursor:
-                      # Execute SELECT 1 to verify database access
-                      cursor.execute("SELECT 1")
-                      result = cursor.fetchone()
-                      
-                      if result != (1,):
-                          raise ValueError("Database query returned unexpected result")
-                      
-                      # Check permissions
-                      cursor.execute("SELECT * FROM pg_user WHERE usename = current_user")
-                      user_info = cursor.fetchone()
-                      
-                      # If source validation, get sample rows
-                      sample_rows = []
-                      if validation_type == 'source':
-                          cursor.execute("""
-                              SELECT tablename 
-                              FROM pg_tables 
-                              WHERE schemaname = 'public' 
-                              LIMIT 5
-                          """)
-                          tables = cursor.fetchall()
-                          for table in tables[:1]:
-                              table_name = table[0]
-                              cursor.execute(f'SELECT * FROM "{table_name}" LIMIT 5')
-                              rows = cursor.fetchall()
-                              columns = [desc[0] for desc in cursor.description]
-                              sample_rows.append({
-                                  'table': table_name,
-                                  'columns': columns,
-                                  'rows': rows  # TODO: Implement PII masking
-                              })
-                  
-                  connection.close()
-                  
-                  return {
-                      'status': 'success',
-                      'db_type': 'postgresql',
-                      'validation_type': validation_type,
-                      'user_info': user_info,
-                      'sample_rows': sample_rows if validation_type == 'source' else None
-                  }
-                  
-              except Exception as e:
-                  return {
-                      'status': 'failed',
-                      'db_type': 'postgresql',
-                      'error': str(e)
-                  }
-      Tags:
-        - Key: ManagedBy
-          Value: CloudBridge
-        - Key: Environment
-          Value: !Ref Environment
-
+      MemorySize: 512
+      Layers: [!Ref DependencyLayer]
+      Environment: {Variables: {MIGRATION_METADATA_TABLE: !Ref MetadataTable, CHUNK_QUEUE_URL: !Ref ChunkQueue, CLOUDBRIDGE_API_URL: !Ref CloudBridgeAPIURL, WORKER_API_SECRET: !Ref WorkerApiSecret}}
+  CloudBridgeMigrationRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: CloudBridgeMigrationRole
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement: [{Effect: Allow, Principal: {AWS: !Sub 'arn:aws:iam::${CloudBridgeControlPlaneAccountId}:root'}, Action: sts:AssumeRole, Condition: {StringEquals: {'sts:ExternalId': !Ref ExternalId}}}]
+      Policies:
+        - PolicyName: control-plane
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - {Effect: Allow, Action: [lambda:InvokeFunction], Resource: [!GetAtt Orchestrator.Arn, !GetAtt Worker.Arn, !GetAtt Validator.Arn]}
+              - {Effect: Allow, Action: [secretsmanager:CreateSecret, secretsmanager:PutSecretValue, secretsmanager:GetSecretValue, secretsmanager:DescribeSecret], Resource: '*'}
 Outputs:
-  MigrationRoleArn:
-    Description: Paste this ARN into CloudBridge as the Role ARN for your AWS connection
-    Value: !GetAtt CloudBridgeMigrationRole.Arn
-    Export:
-      Name: !Sub '${AWS::StackName}-MigrationRoleArn'
-
-  MigrationOrchestratorLambdaArn:
-    Description: ARN of the Migration Orchestrator Lambda function
-    Value: !GetAtt MigrationOrchestratorLambda.Arn
-    Export:
-      Name: !Sub '${AWS::StackName}-OrchestratorArn'
-
-  MigrationWorkerLambdaArn:
-    Description: ARN of the Migration Worker Lambda function
-    Value: !GetAtt MigrationWorkerLambda.Arn
-    Export:
-      Name: !Sub '${AWS::StackName}-WorkerArn'
-
-  ValidationLambdaArn:
-    Description: ARN of the Validation Lambda function
-    Value: !GetAtt ValidationLambda.Arn
-    Export:
-      Name: !Sub '${AWS::StackName}-ValidationArn'
-
-  MigrationMetadataTableName:
-    Description: Name of the DynamoDB table for migration metadata
-    Value: !Ref MigrationMetadataTable
-    Export:
-      Name: !Sub '${AWS::StackName}-MetadataTable'
-
-  MigrationChunkQueueUrl:
-    Description: URL of the SQS queue for migration chunks
-    Value: !Ref MigrationChunkQueue
-    Export:
-      Name: !Sub '${AWS::StackName}-ChunkQueueUrl'
-
-  LambdaExecutionRoleArn:
-    Description: Runtime IAM role used by CloudBridge Lambda functions (do not register in CloudBridge)
-    Value: !GetAtt CloudBridgeLambdaExecutionRole.Arn
-    Export:
-      Name: !Sub '${AWS::StackName}-LambdaExecutionRoleArn'
+  MigrationRoleArn: {Value: !GetAtt CloudBridgeMigrationRole.Arn}
+  MigrationOrchestratorLambdaArn: {Value: !GetAtt Orchestrator.Arn}
+  MigrationWorkerLambdaArn: {Value: !GetAtt Worker.Arn}
+  ValidationLambdaArn: {Value: !GetAtt Validator.Arn}
+  MigrationMetadataTableName: {Value: !Ref MetadataTable}
+  MigrationChunkQueueUrl: {Value: !Ref ChunkQueue}

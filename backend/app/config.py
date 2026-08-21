@@ -66,16 +66,18 @@ class BaseConfig:
     AWS_DEFAULT_REGION = os.getenv("AWS_DEFAULT_REGION", "us-east-1")
     CLOUDBRIDGE_AWS_ACCOUNT_ID = os.getenv("CLOUDBRIDGE_AWS_ACCOUNT_ID", "")
 
-    # ECS Configuration
-    ECS_CLUSTER_NAME = os.getenv("ECS_CLUSTER_NAME", "cloudbridge-migration-cluster")
-    ECS_TASK_DEFINITION = os.getenv("ECS_TASK_DEFINITION", "cloudbridge-migration-task")
-    CLOUDWATCH_LOG_GROUP = os.getenv("CLOUDWATCH_LOG_GROUP", "/aws/ecs/cloudbridge-migration-workers")
+    # Lambda migration configuration.  These are CloudFormation outputs, not
+    # names of ECS resources.
+    CLOUDBRIDGE_ORCHESTRATOR_LAMBDA_ARN = os.getenv("CLOUDBRIDGE_ORCHESTRATOR_LAMBDA_ARN", "")
+    CLOUDBRIDGE_WORKER_LAMBDA_ARN = os.getenv("CLOUDBRIDGE_WORKER_LAMBDA_ARN", "")
+    CLOUDBRIDGE_VALIDATION_LAMBDA_ARN = os.getenv("CLOUDBRIDGE_VALIDATION_LAMBDA_ARN", "")
+    CLOUDBRIDGE_DYNAMODB_TABLE = os.getenv("CLOUDBRIDGE_DYNAMODB_TABLE", "")
 
     # Secrets Manager Configuration
     SECRETS_PREFIX = os.getenv("SECRETS_PREFIX", "cloudbridge/")
     SECRETS_CACHE_TTL = _get_int("SECRETS_CACHE_TTL", 300)
 
-    # Worker API Configuration (shared secret for internal ECS worker ↔ backend communication)
+    # Shared secret used to authenticate Lambda progress callbacks.
     WORKER_API_SECRET = os.getenv("WORKER_API_SECRET", os.getenv("SECRET_KEY", ""))
 
     # SMTP Configuration

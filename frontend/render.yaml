@@ -28,8 +28,6 @@ services:
         value: true
       - key: VITE_FEATURE_APPROVALS
         value: true
-      - key: VITE_FEATURE_ECS
-        value: true
       - key: VITE_FEATURE_OBSERVABILITY
         value: true
       - key: VITE_FEATURE_NOTIFICATIONS
