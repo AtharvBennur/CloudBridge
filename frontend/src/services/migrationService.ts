@@ -30,8 +30,13 @@ export interface MigrationJob {
   total_rows: number | null;
   current_table: string | null;
   error_message: string | null;
+  retry_count?: number;
+  max_retries?: number;
+  chunk_size?: number;
   created_at: string;
   updated_at: string;
+  started_at?: string | null;
+  completed_at?: string | null;
   // Lambda-specific fields
   architecture?: string;
   lambda_migration_id?: number;

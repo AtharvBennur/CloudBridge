@@ -51,10 +51,21 @@ export function MigrationDetailPage() {
         websocketService.joinMigration(migrationId);
         
         // Listen for migration updates including logs
-        websocketService.onAllMigrationUpdates((data) => {
-          if (data.type === "logs" && data.logs) {
-            setLogs(prev => [...prev, ...data.logs]);
+        websocketService.onAllMigrationUpdates((payload) => {
+          if (payload.data?.type === "logs" && payload.data?.logs) {
+            setLogs(prev => [...prev, ...payload.data.logs]);
           }
+          
+          if (payload.data?.message) {
+            setLogs(prev => [...prev, `[${new Date(payload.timestamp || Date.now()).toLocaleTimeString()}] ${payload.data.message}`]);
+          }
+          
+          if (payload.data?.error_message) {
+            setLogs(prev => [...prev, `[${new Date(payload.timestamp || Date.now()).toLocaleTimeString()}] ERROR: ${payload.data.error_message}`]);
+          }
+
+          // Invalidate the query to fetch the latest state whenever an update is received
+          queryClient.invalidateQueries({ queryKey: ["migration", migrationId] });
         });
       })
       .catch((error) => {

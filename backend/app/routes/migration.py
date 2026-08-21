@@ -22,7 +22,9 @@ from app.exceptions.migration import (
     MigrationValidationError,
 )
 from app.middleware.auth import login_required
+from app.models.migration import MigrationJob
 from app.services.migration_service import MigrationService
+from app.utils.migration_serializer import serialize_migration
 
 
 migration_bp = Blueprint("migration", __name__, url_prefix="/migrations")
@@ -66,16 +68,19 @@ def create_migration():
 @login_required
 def list_migrations():
     """Return all migration jobs known to the system."""
-    response = migration_service.list()
-    return jsonify([item.to_dict() for item in response]), 200
+    migration_jobs = MigrationJob.query.order_by(MigrationJob.created_at.desc()).all()
+    return jsonify([serialize_migration(job) for job in migration_jobs]), 200
 
 
 @migration_bp.get('/<int:migration_id>')
 @login_required
 def get_migration(migration_id: int):
     """Return a single migration job by its identifier."""
-    response = migration_service.get(migration_id)
-    return jsonify(response.to_dict()), 200
+    migration_service.get(migration_id)
+    migration = MigrationJob.query.get(migration_id)
+    if migration is None:
+        return jsonify({"error": {"message": f"Migration job {migration_id} was not found."}}), 404
+    return jsonify(serialize_migration(migration)), 200
 
 
 @migration_bp.put('/<int:migration_id>')
