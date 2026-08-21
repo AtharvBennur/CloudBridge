@@ -111,11 +111,19 @@ class LambdaMigrationService:
         if dst and not dst.database_name:
             raise MigrationError(f"Destination database config '{dst.name}' has no database_name set.")
 
-        # Resolve AWS connection
-        effective_connection_id = aws_connection_id or migration.aws_connection_id
+        # Resolve AWS connection (request payload → migration → linked database configs)
+        effective_connection_id = (
+            aws_connection_id
+            or migration.aws_connection_id
+            or (src.aws_connection_id if src else None)
+            or (dst.aws_connection_id if dst else None)
+        )
         aws_connection = AWSConnection.query.get(effective_connection_id)
         if not aws_connection or not aws_connection.role_arn:
             raise MigrationError("No valid AWS connection found.")
+
+        if migration.aws_connection_id != aws_connection.id:
+            migration.aws_connection_id = aws_connection.id
 
         # Create Lambda migration record
         lambda_migration = LambdaMigration(

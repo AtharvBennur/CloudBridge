@@ -20,6 +20,11 @@ def start_migration():
     payload = request.get_json(silent=True) or {}
     migration_id = payload.get("migration_id")
     aws_connection_id = payload.get("aws_connection_id")
+    if aws_connection_id is not None:
+        try:
+            aws_connection_id = int(aws_connection_id)
+        except (TypeError, ValueError):
+            return jsonify({"error": {"message": "aws_connection_id must be an integer."}}), 400
     
     migration = MigrationJob.query.get(migration_id)
     if migration is None:
@@ -39,7 +44,7 @@ def start_migration():
         app_instance = current_app._get_current_object()
         thread = threading.Thread(
             target=lambda_migration_service.execute_migration_background,
-            args=(app_instance, lambda_migration.id, migration_id, migration.aws_connection_id),
+            args=(app_instance, lambda_migration.id, migration_id, lambda_migration.aws_connection_id),
             daemon=True
         )
         thread.start()
@@ -136,9 +141,12 @@ def retry_migration():
 
         # Trigger Lambda retry
         app_instance = current_app._get_current_object()
+        effective_aws_connection_id = (
+            lambda_migration.aws_connection_id if lambda_migration else migration.aws_connection_id
+        )
         thread = threading.Thread(
             target=lambda_migration_service.execute_migration_background,
-            args=(app_instance, lambda_migration.id if lambda_migration else None, migration.id, migration.aws_connection_id),
+            args=(app_instance, lambda_migration.id if lambda_migration else None, migration.id, effective_aws_connection_id),
             daemon=True
         )
         thread.start()

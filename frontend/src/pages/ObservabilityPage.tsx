@@ -66,8 +66,10 @@ export function ObservabilityPage() {
   const latestPendingMigration = pendingMigrations.length > 0 ? pendingMigrations[0] : null;
 
   const startMigrationMutation = useMutation({
-    mutationFn: (migrationId: number) => 
-      migrationService.start(migrationId, latestPendingMigration?.aws_connection_id ?? undefined),
+    mutationFn: (migrationId: number) => {
+      const migration = migrations.find((m) => m.id === migrationId);
+      return migrationService.start(migrationId, migration?.aws_connection_id ?? undefined);
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["migrations"] });
       toast({ title: "Migration started", description: "Migration is now running on Lambda", variant: "success" });

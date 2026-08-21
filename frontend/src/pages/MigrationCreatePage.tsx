@@ -20,6 +20,7 @@ export function MigrationCreatePage() {
         job_name: values.job_name,
         source_database_config_id: parseInt(values.source_database_config_id),
         destination_database_config_id: parseInt(values.destination_database_config_id),
+        aws_connection_id: parseInt(values.aws_connection_id),
         description: values.description || undefined,
       }),
     onSuccess: async () => {

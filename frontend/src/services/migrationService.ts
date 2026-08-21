@@ -52,6 +52,7 @@ export interface CreateMigrationPayload {
   job_name: string;
   source_database_config_id: number;
   destination_database_config_id: number;
+  aws_connection_id: number;
   description?: string;
 }
 

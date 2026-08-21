@@ -25,6 +25,7 @@ export interface WizardValues {
   job_name: string;
   source_database_config_id: string;
   destination_database_config_id: string;
+  aws_connection_id: string;
   description: string;
   chunk_size: string;
   max_retries: string;
@@ -48,6 +49,7 @@ export function MigrationWizard({ onSubmit, isSubmitting }: MigrationWizardProps
     job_name: "",
     source_database_config_id: "",
     destination_database_config_id: "",
+    aws_connection_id: "",
     description: "",
     chunk_size: "1000",
     max_retries: "3",
@@ -72,7 +74,7 @@ export function MigrationWizard({ onSubmit, isSubmitting }: MigrationWizardProps
       case 0:
         return values.job_name.trim().length > 0;
       case 1:
-        return values.source_database_config_id.trim().length > 0 && values.destination_database_config_id.trim().length > 0;
+        return values.source_database_config_id.trim().length > 0 && values.destination_database_config_id.trim().length > 0 && values.aws_connection_id.trim().length > 0;
       case 2:
         return true;
       case 3:
@@ -210,6 +212,24 @@ export function MigrationWizard({ onSubmit, isSubmitting }: MigrationWizardProps
                       <p className="text-xs text-amber-500">No destination databases registered. Add one in Database Configurations.</p>
                     )}
                   </div>
+                  <div className="space-y-2">
+                    <Label>AWS Connection</Label>
+                    <select
+                      className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm"
+                      value={values.aws_connection_id}
+                      onChange={(e) => updateField("aws_connection_id", e.target.value)}
+                    >
+                      <option value="">-- Select AWS connection --</option>
+                      {awsQuery.data?.map((aws) => (
+                        <option key={aws.id} value={aws.id}>
+                          Account {aws.aws_account_id} ({aws.aws_region})
+                        </option>
+                      ))}
+                    </select>
+                    {awsQuery.data?.length === 0 && (
+                      <p className="text-xs text-amber-500">No AWS connections registered. Add one in AWS Connections.</p>
+                    )}
+                  </div>
                 </>
               )}
 
@@ -261,6 +281,7 @@ export function MigrationWizard({ onSubmit, isSubmitting }: MigrationWizardProps
                     <ReviewField label="Description" value={values.description || "—"} />
                     <ReviewField label="Source Database" value={sourceDbs.find(d => d.id === parseInt(values.source_database_config_id))?.name || values.source_database_config_id} />
                     <ReviewField label="Destination Database" value={destDbs.find(d => d.id === parseInt(values.destination_database_config_id))?.name || values.destination_database_config_id} />
+                    <ReviewField label="AWS Connection" value={awsQuery.data?.find(a => a.id === parseInt(values.aws_connection_id)) ? `Account ${awsQuery.data.find(a => a.id === parseInt(values.aws_connection_id))?.aws_account_id} (${awsQuery.data.find(a => a.id === parseInt(values.aws_connection_id))?.aws_region})` : values.aws_connection_id} />
                     <ReviewField label="Chunk Size" value={`${values.chunk_size} rows/batch`} />
                     <ReviewField label="Max Retries" value={values.max_retries} />
                   </div>
