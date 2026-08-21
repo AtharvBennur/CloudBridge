@@ -151,6 +151,12 @@ Resources:
                 Action:
                   - sts:GetCallerIdentity
                 Resource: '*'
+              - Sid: EC2RegionValidation
+                Effect: Allow
+                Action:
+                  - ec2:DescribeRegions
+                  - ec2:DescribeAvailabilityZones
+                Resource: '*'
               - Sid: LambdaInvoke
                 Effect: Allow
                 Action:
@@ -163,6 +169,7 @@ Resources:
                 Action:
                   - secretsmanager:GetSecretValue
                   - secretsmanager:DescribeSecret
+                  - secretsmanager:ListSecrets
                   - secretsmanager:CreateSecret
                   - secretsmanager:UpdateSecret
                   - secretsmanager:PutSecretValue

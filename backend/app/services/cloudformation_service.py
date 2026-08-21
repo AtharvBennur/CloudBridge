@@ -143,6 +143,15 @@ def _cross_account_policy_statements() -> list[dict[str, Any]]:
             "Resource": "*",
         },
         {
+            "Sid": "EC2RegionValidation",
+            "Effect": "Allow",
+            "Action": [
+                "ec2:DescribeRegions",
+                "ec2:DescribeAvailabilityZones",
+            ],
+            "Resource": "*",
+        },
+        {
             "Sid": "LambdaInvoke",
             "Effect": "Allow",
             "Action": [
@@ -160,6 +169,7 @@ def _cross_account_policy_statements() -> list[dict[str, Any]]:
             "Action": [
                 "secretsmanager:GetSecretValue",
                 "secretsmanager:DescribeSecret",
+                "secretsmanager:ListSecrets",
                 "secretsmanager:CreateSecret",
                 "secretsmanager:UpdateSecret",
                 "secretsmanager:PutSecretValue",

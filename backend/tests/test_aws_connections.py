@@ -211,6 +211,10 @@ def test_cloudformation_template_is_lambda_based() -> None:
     assert orchestrator["Handler"] == "index.lambda_handler"
     assert orchestrator["Runtime"] == "python3.12"
 
+    migration_policy = resources["CloudBridgeMigrationRole"]["Properties"]["Policies"][0]["PolicyDocument"]["Statement"]
+    policy_sids = {stmt["Sid"] for stmt in migration_policy}
+    assert "EC2RegionValidation" in policy_sids
+
 
 def test_register_role_arn_rejects_lambda_execution_role() -> None:
     app = create_app("testing")
