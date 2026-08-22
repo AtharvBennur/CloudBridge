@@ -285,7 +285,7 @@ export function DatabaseConfigPage() {
                     id="aws_connection_id"
                     className="flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm shadow-sm"
                     value={formValues.aws_connection_id}
-                    onChange={(e) => updateField("aws_connection_id", e.target.value)}
+                    onChange={(e) => setFormValues({ ...formValues, aws_connection_id: e.target.value })}
                   >
                     <option value="">-- Optional --</option>
                     {awsConnectionsQuery.data?.map((conn) => (

@@ -167,9 +167,9 @@ export function AccountPage() {
                   className="flex items-center justify-between p-3 rounded-lg border border-border/50"
                 >
                   <div>
-                    <p className="text-sm font-medium">{log.event_type}</p>
+                    <p className="text-sm font-medium">{log.action}</p>
                     <p className="text-xs text-muted-foreground">
-                      {log.event_description}
+                      {log.entity_type}
                       {log.user_email && ` \u2022 ${log.user_email}`}
                     </p>
                   </div>

@@ -375,13 +375,13 @@ export function ObservabilityPage() {
                         <CheckCircle2 className="h-5 w-5" />
                       )}
                     </div>
-                    <div>
-                      <h4 className="font-semibold">{log.event_type}</h4>
-                      <p className="text-sm text-muted-foreground">
-                        {log.event_description}
+                      <div>
+                        <h4 className="font-semibold">{log.action}</h4>
+                        <p className="text-sm text-muted-foreground">
+                          {log.entity_type}
                       </p>
                       <div className="flex items-center gap-2 mt-1 text-xs text-muted-foreground">
-                        <span>{log.event_category}</span>
+                          <span>{log.entity_type}</span>
                         {log.user_email && <span>\u2022 {log.user_email}</span>}
                       </div>
                     </div>
