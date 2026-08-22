@@ -1,9 +1,9 @@
 """Generate downloadable CloudFormation templates for customer AWS onboarding.
 
-Produces a self-contained CloudFormation stack that creates:
+Produces a simple CloudFormation stack that creates:
   1. CloudBridgeMigrationRole      – cross-account role assumed by the CloudBridge backend
   2. CloudBridgeLambdaExecutionRole – runtime role for Lambda migration functions
-  3. Lambda functions, DynamoDB, SQS, and CloudWatch log groups for serverless migrations
+  3. Basic Lambda functions for migration execution
 """
 
 from __future__ import annotations
@@ -79,29 +79,6 @@ def _lambda_execution_policy_statements() -> list[dict[str, Any]]:
             "Action": [
                 "rds:DescribeDBInstances",
                 "rds:DescribeDBClusters",
-                "rds:ListTagsForResource",
-            ],
-            "Resource": "*",
-        },
-        {
-            "Sid": "SecretsManagerAccess",
-            "Effect": "Allow",
-            "Action": [
-                "secretsmanager:GetSecretValue",
-                "secretsmanager:DescribeSecret",
-                "secretsmanager:CreateSecret",
-                "secretsmanager:UpdateSecret",
-                "secretsmanager:PutSecretValue",
-                "secretsmanager:TagResource",
-            ],
-            "Resource": "*",
-        },
-        {
-            "Sid": "KMSDecrypt",
-            "Effect": "Allow",
-            "Action": [
-                "kms:Decrypt",
-                "kms:DescribeKey",
             ],
             "Resource": "*",
         },
@@ -118,50 +95,12 @@ def _lambda_execution_policy_statements() -> list[dict[str, Any]]:
             },
         },
         {
-            "Sid": "SQSAccess",
-            "Effect": "Allow",
-            "Action": [
-                "sqs:SendMessage",
-                "sqs:ReceiveMessage",
-                "sqs:DeleteMessage",
-                "sqs:GetQueueAttributes",
-            ],
-            "Resource": {"Fn::GetAtt": ["MigrationChunkQueue", "Arn"]},
-        },
-        {
-            "Sid": "DynamoDBAccess",
-            "Effect": "Allow",
-            "Action": [
-                "dynamodb:PutItem",
-                "dynamodb:GetItem",
-                "dynamodb:UpdateItem",
-                "dynamodb:Query",
-                "dynamodb:Scan",
-                "dynamodb:DeleteItem",
-            ],
-            "Resource": [
-                {"Fn::GetAtt": ["MigrationMetadataTable", "Arn"]},
-                {"Fn::Sub": "${MigrationMetadataTable.Arn}/index/*"},
-            ],
-        },
-        {
-            "Sid": "LambdaInvocation",
-            "Effect": "Allow",
-            "Action": ["lambda:InvokeFunction"],
-            "Resource": {
-                "Fn::Sub": "arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:cloudbridge-migration-worker",
-            },
-        },
-        {
             "Sid": "EC2NetworkAccess",
             "Effect": "Allow",
             "Action": [
                 "ec2:CreateNetworkInterface",
                 "ec2:DeleteNetworkInterface",
                 "ec2:DescribeNetworkInterfaces",
-                "ec2:DescribeSecurityGroups",
-                "ec2:DescribeSubnets",
-                "ec2:DescribeVpcs",
             ],
             "Resource": "*",
         },
@@ -199,50 +138,10 @@ def _cross_account_policy_statements() -> list[dict[str, Any]]:
             },
         },
         {
-            "Sid": "SecretsManagerAccess",
-            "Effect": "Allow",
-            "Action": [
-                "secretsmanager:GetSecretValue",
-                "secretsmanager:DescribeSecret",
-                "secretsmanager:ListSecrets",
-                "secretsmanager:CreateSecret",
-                "secretsmanager:UpdateSecret",
-                "secretsmanager:PutSecretValue",
-                "secretsmanager:DeleteSecret",
-                "secretsmanager:TagResource",
-            ],
-            "Resource": "*",
-        },
-        {
             "Sid": "RDSReadOnly",
             "Effect": "Allow",
             "Action": ["rds:Describe*"],
             "Resource": "*",
-        },
-        {
-            "Sid": "DynamoDBAccess",
-            "Effect": "Allow",
-            "Action": [
-                "dynamodb:PutItem",
-                "dynamodb:GetItem",
-                "dynamodb:UpdateItem",
-                "dynamodb:Query",
-                "dynamodb:Scan",
-            ],
-            "Resource": [
-                {"Fn::GetAtt": ["MigrationMetadataTable", "Arn"]},
-                {"Fn::Sub": "${MigrationMetadataTable.Arn}/index/*"},
-            ],
-        },
-        {
-            "Sid": "SQSAccess",
-            "Effect": "Allow",
-            "Action": [
-                "sqs:SendMessage",
-                "sqs:ReceiveMessage",
-                "sqs:GetQueueAttributes",
-            ],
-            "Resource": {"Fn::GetAtt": ["MigrationChunkQueue", "Arn"]},
         },
         {
             "Sid": "CloudWatchLogsRead",
@@ -331,7 +230,7 @@ class CloudFormationService:
             "AWSTemplateFormatVersion": "2010-09-09",
             "Description": (
                 "CloudBridge Lambda-based migration platform — deploys cross-account "
-                "IAM roles, Lambda functions, DynamoDB, and SQS for serverless data migrations."
+                "IAM roles and Lambda functions for serverless data migrations."
             ),
             "Parameters": {
                 "ExternalId": {
@@ -355,66 +254,6 @@ class CloudFormationService:
                 },
             },
             "Resources": {
-                "MigrationChunkDLQ": {
-                    "Type": "AWS::SQS::Queue",
-                    "Properties": {
-                        "QueueName": "cloudbridge-migration-chunks-dlq",
-                        "MessageRetentionPeriod": 1209600,
-                        "Tags": [
-                            {"Key": "ManagedBy", "Value": "CloudBridge"},
-                            {"Key": "Environment", "Value": {"Ref": "Environment"}},
-                        ],
-                    },
-                },
-                "MigrationChunkQueue": {
-                    "Type": "AWS::SQS::Queue",
-                    "DependsOn": ["MigrationChunkDLQ"],
-                    "Properties": {
-                        "QueueName": "cloudbridge-migration-chunks",
-                        "VisibilityTimeout": 900,
-                        "MessageRetentionPeriod": 1209600,
-                        "RedrivePolicy": {
-                            "deadLetterTargetArn": {"Fn::GetAtt": ["MigrationChunkDLQ", "Arn"]},
-                            "maxReceiveCount": 5,
-                        },
-                        "Tags": [
-                            {"Key": "ManagedBy", "Value": "CloudBridge"},
-                            {"Key": "Environment", "Value": {"Ref": "Environment"}},
-                        ],
-                    },
-                },
-                "MigrationMetadataTable": {
-                    "Type": "AWS::DynamoDB::Table",
-                    "Properties": {
-                        "TableName": "cloudbridge-migration-metadata",
-                        "BillingMode": "PAY_PER_REQUEST",
-                        "AttributeDefinitions": [
-                            {"AttributeName": "migration_id", "AttributeType": "S"},
-                            {"AttributeName": "chunk_id", "AttributeType": "S"},
-                            {"AttributeName": "status", "AttributeType": "S"},
-                        ],
-                        "KeySchema": [
-                            {"AttributeName": "migration_id", "KeyType": "HASH"},
-                            {"AttributeName": "chunk_id", "KeyType": "RANGE"},
-                        ],
-                        "GlobalSecondaryIndexes": [
-                            {
-                                "IndexName": "StatusIndex",
-                                "KeySchema": [
-                                    {"AttributeName": "status", "KeyType": "HASH"},
-                                ],
-                                "Projection": {"ProjectionType": "ALL"},
-                            },
-                        ],
-                        "PointInTimeRecoverySpecification": {
-                            "PointInTimeRecoveryEnabled": True,
-                        },
-                        "Tags": [
-                            {"Key": "ManagedBy", "Value": "CloudBridge"},
-                            {"Key": "Environment", "Value": {"Ref": "Environment"}},
-                        ],
-                    },
-                },
                 "MigrationOrchestratorLogGroup": {
                     "Type": "AWS::Logs::LogGroup",
                     "Properties": {
@@ -474,8 +313,6 @@ class CloudFormationService:
                 "CloudBridgeMigrationRole": {
                     "Type": "AWS::IAM::Role",
                     "DependsOn": [
-                        "MigrationMetadataTable",
-                        "MigrationChunkQueue",
                         "CloudBridgeLambdaExecutionRole",
                     ],
                     "Properties": {
@@ -524,7 +361,6 @@ class CloudFormationService:
                     memory_size=1024,
                     environment={
                         "CLOUDBRIDGE_API_URL": {"Ref": "CloudBridgeAPIURL"},
-                        "MIGRATION_METADATA_TABLE": {"Ref": "MigrationMetadataTable"},
                     },
                 ),
                 "MigrationOrchestratorLambda": _lambda_function(
@@ -535,8 +371,6 @@ class CloudFormationService:
                     memory_size=512,
                     environment={
                         "CLOUDBRIDGE_API_URL": {"Ref": "CloudBridgeAPIURL"},
-                        "MIGRATION_METADATA_TABLE": {"Ref": "MigrationMetadataTable"},
-                        "CHUNK_QUEUE_URL": {"Ref": "MigrationChunkQueue"},
                         "WORKER_LAMBDA_ARN": {"Fn::GetAtt": ["MigrationWorkerLambda", "Arn"]},
                     },
                 ),
@@ -570,14 +404,6 @@ class CloudFormationService:
                 "ValidationLambdaArn": {
                     "Description": "ARN of the Validation Lambda function",
                     "Value": {"Fn::GetAtt": ["ValidationLambda", "Arn"]},
-                },
-                "MigrationMetadataTableName": {
-                    "Description": "DynamoDB table for migration metadata",
-                    "Value": {"Ref": "MigrationMetadataTable"},
-                },
-                "MigrationChunkQueueUrl": {
-                    "Description": "SQS queue URL for migration chunks",
-                    "Value": {"Ref": "MigrationChunkQueue"},
                 },
                 "LambdaExecutionRoleArn": {
                     "Description": "Runtime IAM role used by CloudBridge Lambda functions (do not register this in CloudBridge)",

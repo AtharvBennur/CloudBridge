@@ -297,7 +297,7 @@ export function ObservabilityPage() {
                   </p>
                 </div>
                 <div className="p-4 rounded-xl border border-border/50">
-                  <p className="text-xs text-muted-foreground">Active ECS Tasks</p>
+                  <p className="text-xs text-muted-foreground">Active Lambda Functions</p>
                   <p className="text-2xl font-semibold mt-1">
                     {0}
                   </p>

@@ -12,7 +12,7 @@ export const env = {
     cdc: import.meta.env.VITE_FEATURE_CDC !== "false",
     schemaDrift: import.meta.env.VITE_FEATURE_SCHEMA_DRIFT !== "false",
     approvals: import.meta.env.VITE_FEATURE_APPROVALS !== "false",
-    ecs: import.meta.env.VITE_FEATURE_ECS !== "false",
+    lambda: import.meta.env.VITE_FEATURE_LAMBDA !== "false",
     observability: import.meta.env.VITE_FEATURE_OBSERVABILITY !== "false",
     notifications: import.meta.env.VITE_FEATURE_NOTIFICATIONS !== "false",
     rollback: import.meta.env.VITE_FEATURE_ROLLBACK !== "false",

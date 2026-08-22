@@ -2,13 +2,13 @@ import { apiClient } from "./apiClient";
 
 export interface AuditLog {
   id: number;
-  event_type: string;
-  event_category: string;
-  event_description: string;
-  migration_id?: number;
+  timestamp: string;
+  action: string;
+  entity_type: string;
+  entity_id?: number;
   aws_connection_id?: number;
   database_config_id?: number;
-  ecs_task_id?: number;
+  lambda_function_id?: string;
   user_id?: string;
   user_email?: string;
   severity: "INFO" | "WARNING" | "ERROR" | "CRITICAL";

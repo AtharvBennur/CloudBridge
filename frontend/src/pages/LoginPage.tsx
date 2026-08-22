@@ -142,7 +142,7 @@ export function LoginPage() {
   const features = [
     { icon: Database, title: "CDC Replication", description: "Real-time change data capture", gradient: "from-blue-500 to-cyan-400" },
     { icon: Shield, title: "Schema Drift Detection", description: "Automated monitoring & alerts", gradient: "from-violet-500 to-purple-400" },
-    { icon: Zap, title: "ECS Execution", description: "Scalable migration workers", gradient: "from-amber-500 to-orange-400" },
+    { icon: Zap, title: "Lambda Execution", description: "Serverless migration workers", gradient: "from-amber-500 to-orange-400" },
   ];
 
   return (

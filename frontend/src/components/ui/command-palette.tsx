@@ -41,7 +41,7 @@ const commands: CommandItem[] = [
   { label: "Rollback", description: "Migration rollback controls", icon: RotateCcw, href: "/rollback", keywords: ["rollback", "undo"] },
   { label: "Databases", description: "Database endpoint configurations", icon: Server, href: "/database-configs", keywords: ["database", "db", "endpoint"] },
   { label: "AWS Connections", description: "Manage AWS account connections", icon: Cloud, href: "/aws-connections", keywords: ["aws", "cloud", "iam"] },
-  { label: "ECS Tasks", description: "View ECS task execution", icon: Activity, href: "/ecs", keywords: ["ecs", "fargate", "tasks"] },
+  { label: "Lambda Functions", description: "View Lambda function execution", icon: Activity, href: "/lambda", keywords: ["lambda", "functions", "workers"] },
   { label: "Pre-flight Checks", description: "Run pre-migration validation", icon: ClipboardCheck, href: "/preflight", keywords: ["preflight", "validate", "check"] },
   { label: "Observability", description: "Audit logs and metrics", icon: BarChart3, href: "/observability", keywords: ["logs", "metrics", "monitor"] },
   { label: "Notifications", description: "Notification center", icon: Bell, href: "/notifications", keywords: ["alerts", "notify"] },

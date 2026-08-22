@@ -274,10 +274,10 @@ export function HelpPage() {
                 </p>
               </div>
               <div className="p-4 rounded-xl border border-border/50">
-                <h4 className="font-semibold text-sm mb-2">ECS Workers</h4>
+                <h4 className="font-semibold text-sm mb-2">Lambda Workers</h4>
                 <p className="text-xs text-muted-foreground">
-                  Docker containers running on AWS ECS Fargate. Execute the
-                  actual data movement between databases within your VPC.
+                  AWS Lambda functions that execute the actual data movement
+                  between databases within your VPC.
                 </p>
               </div>
             </div>

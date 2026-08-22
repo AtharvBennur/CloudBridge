@@ -26,10 +26,10 @@ class CreateMigrationRequest:
     """Represents the payload required to create a new migration job."""
 
     job_name: str
+    aws_connection_id: int
     source_database: str | None = None
     destination_database: str | None = None
     description: str | None = None
-    aws_connection_id: int
     source_database_config_id: int | None = None
     destination_database_config_id: int | None = None
 

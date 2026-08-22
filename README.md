@@ -12,21 +12,21 @@ CloudBridge is a production-ready platform for orchestrating, monitoring, and ma
 ┌─────────────────────────────────────────────────────────────┐
 │                        Frontend (React/TS)                   │
 │  Dashboard · Migrations · CDC · Schema Drift · Approvals   │
-│  ECS Tasks · Observability · Notifications · Rollback      │
+│  Lambda Functions · Observability · Notifications · Rollback│
 │  Account · Settings · Help                                  │
 ├─────────────────────────────────────────────────────────────┤
 │                     API Gateway (Nginx)                      │
 ├─────────────────────────────────────────────────────────────┤
 │                    Backend (Flask/Python)                     │
-│  Auth · Migrations · CDC · Schema · ECS · Observability    │
+│  Auth · Migrations · CDC · Schema · Lambda · Observability  │
 │  Notifications · Rollback · Preflight · WebSocket           │
 ├─────────────────────────────────────────────────────────────┤
-│                   Worker Layer (Threads/ECS)                 │
+│                   Worker Layer (Lambda Functions)            │
 │  Migration Workers · CDC Workers · Schema Workers           │
 ├─────────────────────────────────────────────────────────────┤
 │                     AWS Integration Layer                     │
 │  STS AssumeRole · Secrets Manager · CloudFormation          │
-│  ECS Fargate · CloudWatch · Cognito                        │
+│  AWS Lambda · CloudWatch · Cognito                         │
 └─────────────────────────────────────────────────────────────┘
 ```
 
@@ -36,7 +36,7 @@ CloudBridge is a production-ready platform for orchestrating, monitoring, and ma
 - **Change Data Capture (CDC)** — Real-time replication monitoring with WAL-based change tracking
 - **Schema Drift Detection** — Automated schema comparison with approval workflows and rollback support
 - **AWS Account Integration** — STS AssumeRole across customer accounts with IAM validation
-- **ECS/Fargate Orchestration** — Managed container execution for migration workers
+- **AWS Lambda Orchestration** — Serverless function execution for migration workers
 - **Pre-flight Validation** — Automated connectivity, permissions, and configuration checks
 - **Approval Workflows** — Multi-level schema change approval with risk-based auto-approval
 - **Rollback & Recovery** — Checkpoint-based rollback with full migration restart capability
@@ -53,9 +53,9 @@ CloudBridge is a production-ready platform for orchestrating, monitoring, and ma
 | Frontend | React 19, TypeScript, Vite 6, Tailwind CSS, TanStack Query |
 | Backend | Python 3.12, Flask 3.1, SQLAlchemy 2.0, Flask-SocketIO |
 | Database | PostgreSQL (production), SQLite (development) |
-| AWS | STS, Secrets Manager, CloudFormation, ECS/Fargate, CloudWatch |
+| AWS | STS, Secrets Manager, CloudFormation, AWS Lambda, CloudWatch |
 | Auth | JWT (PyJWT), Google OAuth, AWS Cognito |
-| Workers | Threading (local), ECS/Fargate (production) |
+| Workers | Threading (local), AWS Lambda (production) |
 | Real-time | WebSocket (Socket.IO) |
 | Deployment | Docker, Docker Compose, Nginx |
 
@@ -151,7 +151,7 @@ CloudBridge requires specific IAM permissions in your AWS account:
 1. **Control Plane Account** (where CloudBridge runs):
    - STS: `AssumeRole` to customer accounts
    - CloudFormation: Create stacks for IAM roles
-   - ECS: Run Fargate tasks for migration workers
+   - Lambda: Invoke Lambda functions for migration workers
    - CloudWatch: Create metrics and log groups
    - Secrets Manager: Create secrets for database credentials
 
@@ -190,7 +190,7 @@ Key environment variables (see `backend/.env.example` for complete list):
 | CDC | `/cdc` | Change Data Capture configuration and events |
 | Schema Drift | `/schema-drift` | Schema snapshots and drift detection |
 | Schema Approval | `/schema-approval` | Approval workflow for schema changes |
-| ECS | `/ecs` | Fargate task lifecycle management |
+| Lambda | `/lambda` | Lambda function lifecycle management |
 | Observability | `/observability` | Audit logs, metrics, system health |
 | Notifications | `/notifications` | Config management and delivery history |
 | Rollback | `/rollback` | Checkpoint-based rollback and recovery |
