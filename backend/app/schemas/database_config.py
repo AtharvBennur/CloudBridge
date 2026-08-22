@@ -21,8 +21,6 @@ class CreateDatabaseConfigRequest:
     purpose: str
     database_name: str | None = None
     aws_connection_id: int | None = None
-    secret_arn: str | None = None
-    secret_name: str | None = None
     provisioning_config: str | None = None
 
     @classmethod
@@ -39,8 +37,6 @@ class CreateDatabaseConfigRequest:
         purpose = payload.get("purpose", "SOURCE")
         database_name = payload.get("database_name")
         aws_connection_id = payload.get("aws_connection_id")
-        secret_arn = payload.get("secret_arn")
-        secret_name = payload.get("secret_name")
         provisioning_config = payload.get("provisioning_config")
 
         if not isinstance(name, str) or not name.strip():
@@ -61,7 +57,7 @@ class CreateDatabaseConfigRequest:
             if not isinstance(database_name, str) or not database_name.strip():
                 raise ValueError("database_name is required for source database configurations. This is the actual database name on the server.")
         else:
-            # Password is also required for destination for ECS worker
+            # Password is also required for destination for Lambda worker
             if not isinstance(password, str) or not password.strip():
                 raise ValueError("Password is required for destination database configurations.")
 
@@ -81,12 +77,10 @@ class CreateDatabaseConfigRequest:
             host=host.strip(),
             port=port,
             username=username.strip(),
-            password=password.strip() if password else "",  # Always store password for ECS worker
+            password=password.strip() if password else "",
             purpose=normalized_purpose,
             database_name=database_name.strip() if isinstance(database_name, str) and database_name.strip() else None,
             aws_connection_id=aws_connection_id,
-            secret_arn=secret_arn.strip() if isinstance(secret_arn, str) and secret_arn.strip() else None,
-            secret_name=secret_name.strip() if isinstance(secret_name, str) and secret_name.strip() else None,
             provisioning_config=provisioning_config if isinstance(provisioning_config, str) else None,
         )
 
@@ -104,8 +98,6 @@ class DatabaseConfigResponse:
     database_name: str | None
     purpose: str
     aws_connection_id: int | None
-    secret_arn: str | None
-    secret_name: str | None
     provisioning_config: str | None
     created_at: str
     updated_at: str
@@ -121,8 +113,6 @@ class DatabaseConfigResponse:
             "database_name": self.database_name,
             "purpose": self.purpose,
             "aws_connection_id": self.aws_connection_id,
-            "secret_arn": self.secret_arn,
-            "secret_name": self.secret_name,
             "provisioning_config": self.provisioning_config,
             "created_at": self.created_at,
             "updated_at": self.updated_at,
@@ -140,8 +130,6 @@ class DatabaseConfigResponse:
             database_name=config.database_name,
             purpose=config.purpose,
             aws_connection_id=config.aws_connection_id,
-            secret_arn=config.secret_arn,
-            secret_name=config.secret_name,
             provisioning_config=config.provisioning_config,
             created_at=config.created_at.isoformat() if config.created_at else "",
             updated_at=config.updated_at.isoformat() if config.updated_at else "",

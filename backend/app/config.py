@@ -66,16 +66,11 @@ class BaseConfig:
     AWS_DEFAULT_REGION = os.getenv("AWS_DEFAULT_REGION", "us-east-1")
     CLOUDBRIDGE_AWS_ACCOUNT_ID = os.getenv("CLOUDBRIDGE_AWS_ACCOUNT_ID", "")
 
-    # Lambda migration configuration.  These are CloudFormation outputs, not
-    # names of ECS resources.
+    # Lambda migration configuration. These are CloudFormation outputs for Lambda functions.
     CLOUDBRIDGE_ORCHESTRATOR_LAMBDA_ARN = os.getenv("CLOUDBRIDGE_ORCHESTRATOR_LAMBDA_ARN", "")
     CLOUDBRIDGE_WORKER_LAMBDA_ARN = os.getenv("CLOUDBRIDGE_WORKER_LAMBDA_ARN", "")
     CLOUDBRIDGE_VALIDATION_LAMBDA_ARN = os.getenv("CLOUDBRIDGE_VALIDATION_LAMBDA_ARN", "")
     CLOUDBRIDGE_DYNAMODB_TABLE = os.getenv("CLOUDBRIDGE_DYNAMODB_TABLE", "")
-
-    # Secrets Manager Configuration
-    SECRETS_PREFIX = os.getenv("SECRETS_PREFIX", "cloudbridge/")
-    SECRETS_CACHE_TTL = _get_int("SECRETS_CACHE_TTL", 300)
 
     # Shared secret used to authenticate Lambda progress callbacks.
     WORKER_API_SECRET = os.getenv("WORKER_API_SECRET", os.getenv("SECRET_KEY", ""))

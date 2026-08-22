@@ -29,10 +29,10 @@ class AuditEventType:
     SCHEMA_APPROVED = "SCHEMA_APPROVED"
     SCHEMA_REJECTED = "SCHEMA_REJECTED"
     
-    ECS_TASK_CREATED = "ECS_TASK_CREATED"
-    ECS_TASK_STARTED = "ECS_TASK_STARTED"
-    ECS_TASK_STOPPED = "ECS_TASK_STOPPED"
-    ECS_TASK_FAILED = "ECS_TASK_FAILED"
+    LAMBDA_INVOKED = "LAMBDA_INVOKED"
+    LAMBDA_STARTED = "LAMBDA_STARTED"
+    LAMBDA_COMPLETED = "LAMBDA_COMPLETED"
+    LAMBDA_FAILED = "LAMBDA_FAILED"
     
     AWS_CONNECTION_CREATED = "AWS_CONNECTION_CREATED"
     AWS_CONNECTION_CONNECTED = "AWS_CONNECTION_CONNECTED"
@@ -54,7 +54,7 @@ class AuditEventType:
         MIGRATION_PAUSED, MIGRATION_RESUMED, MIGRATION_CANCELLED,
         CDC_STARTED, CDC_STOPPED, CDC_ERROR,
         SCHEMA_DRIFT_DETECTED, SCHEMA_APPROVAL_REQUESTED, SCHEMA_APPROVED, SCHEMA_REJECTED,
-        ECS_TASK_CREATED, ECS_TASK_STARTED, ECS_TASK_STOPPED, ECS_TASK_FAILED,
+        LAMBDA_INVOKED, LAMBDA_STARTED, LAMBDA_COMPLETED, LAMBDA_FAILED,
         AWS_CONNECTION_CREATED, AWS_CONNECTION_CONNECTED, AWS_CONNECTION_DISCONNECTED,
         DATABASE_CONFIG_CREATED, DATABASE_CONFIG_UPDATED, DATABASE_CONFIG_DELETED,
         USER_LOGIN, USER_LOGOUT, ERROR, WARNING, INFO,
@@ -70,14 +70,13 @@ class AuditLog(db.Model):
     
     # Event metadata
     event_type = db.Column(db.String(64), nullable=False, index=True)
-    event_category = db.Column(db.String(32), nullable=False, index=True)  # MIGRATION, CDC, SCHEMA, ECS, AWS, DATABASE, USER, SYSTEM
+    event_category = db.Column(db.String(32), nullable=False, index=True)  # MIGRATION, CDC, SCHEMA, LAMBDA, AWS, DATABASE, USER, SYSTEM
     
     # Related entities
     migration_id = db.Column(db.Integer, db.ForeignKey("migration_jobs.id"), nullable=True, index=True)
     aws_connection_id = db.Column(db.Integer, db.ForeignKey("aws_connections.id"), nullable=True, index=True)
     database_config_id = db.Column(db.Integer, db.ForeignKey("database_configs.id"), nullable=True, index=True)
-    
-    # User context
+    lambda_function_id = db.Column(db.String(255), nullable=True, index=True)
     user_id = db.Column(db.String(255), nullable=True, index=True)
     user_email = db.Column(db.String(255), nullable=True)
     

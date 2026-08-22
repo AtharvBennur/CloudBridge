@@ -48,7 +48,7 @@ def create_audit_log():
             migration_id=payload.get("migration_id"),
             aws_connection_id=payload.get("aws_connection_id"),
             database_config_id=payload.get("database_config_id"),
-            ecs_task_id=payload.get("ecs_task_id"),
+            lambda_function_id=payload.get("lambda_function_id"),
             user_id=payload.get("user_id"),
             user_email=payload.get("user_email"),
             event_metadata=payload.get("event_metadata"),

@@ -1,7 +1,7 @@
 """
 Purpose:
 Defines the abstract interface for all migration workers.
-Future targets (e.g. ECS Fargate task executor) will inherit from this base class.
+Future targets (e.g. Lambda function executor) will inherit from this base class.
 """
 
 from abc import ABC, abstractmethod

@@ -34,7 +34,7 @@ class ObservabilityService:
         migration_id: int | None = None,
         aws_connection_id: int | None = None,
         database_config_id: int | None = None,
-        ecs_task_id: int | None = None,
+        lambda_function_id: str | None = None,
         user_id: str | None = None,
         user_email: str | None = None,
         event_metadata: dict[str, Any] | None = None,
@@ -48,7 +48,7 @@ class ObservabilityService:
             migration_id=migration_id,
             aws_connection_id=aws_connection_id,
             database_config_id=database_config_id,
-            ecs_task_id=ecs_task_id,
+            lambda_function_id=lambda_function_id,
             user_id=user_id,
             user_email=user_email,
             event_metadata=json.dumps(event_metadata) if event_metadata else None,
@@ -164,7 +164,7 @@ class ObservabilityService:
         """Get aggregated metrics for a migration."""
         from app.models.migration import MigrationJob
         from app.models.cdc_event import CDCEvent
-        from app.models.ecs_task import ECSTask
+        from app.models.lambda_migration import LambdaMigration
 
         migration = MigrationJob.query.get(migration_id)
         if not migration:
@@ -178,8 +178,8 @@ class ObservabilityService:
         cdc_events_processed = CDCEvent.query.filter_by(migration_id=migration_id, status="PROCESSED").count()
         cdc_events_failed = CDCEvent.query.filter_by(migration_id=migration_id, status="FAILED").count()
         
-        # Get ECS task information
-        ecs_tasks = ECSTask.query.filter_by(migration_id=migration_id).all()
+        # Get Lambda migration information
+        lambda_migration = LambdaMigration.query.filter_by(migration_id=migration_id).first()
 
         return {
             "migration_id": migration_id,
@@ -205,16 +205,14 @@ class ObservabilityService:
                 "failed": cdc_events_failed,
                 "pending": cdc_events_total - cdc_events_processed - cdc_events_failed,
             },
-            "ecs_tasks": [
-                {
-                    "task_id": task.id,
-                    "status": task.status,
-                    "task_arn": task.task_arn,
-                    "started_at": task.started_at.isoformat() if task.started_at else None,
-                    "stopped_at": task.stopped_at.isoformat() if task.stopped_at else None,
-                }
-                for task in ecs_tasks
-            ],
+            "lambda_migration": {
+                "id": lambda_migration.id if lambda_migration else None,
+                "status": lambda_migration.status.value if lambda_migration else None,
+                "chunks_created": lambda_migration.chunks_created if lambda_migration else 0,
+                "chunks_completed": lambda_migration.chunks_completed if lambda_migration else 0,
+                "chunks_failed": lambda_migration.chunks_failed if lambda_migration else 0,
+                "orchestrator_arn": lambda_migration.orchestrator_arn if lambda_migration else None,
+            } if lambda_migration else None,
         }
 
     def get_system_health_metrics(self) -> dict[str, Any]:
