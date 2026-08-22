@@ -184,6 +184,23 @@ export function AWSConnectionPage() {
     }
   };
 
+  const handleDiscoverInfrastructure = async (id: number) => {
+    const key = `discover-${id}`;
+    setLoadingAction((prev) => ({ ...prev, [key]: true }));
+    setErrorMessage(null);
+    try {
+      const result = await awsConnectionService.discoverInfrastructure(id);
+      setActiveResults((prev) => ({ ...prev, [id]: { type: "infrastructure", data: result } }));
+      await queryClient.invalidateQueries({ queryKey: ["aws-connections"] });
+    } catch (err: any) {
+      const msg = err?.message || "Infrastructure discovery failed.";
+      setActiveResults((prev) => ({ ...prev, [id]: { type: "error", message: msg } }));
+      setErrorMessage(msg);
+    } finally {
+      setLoadingAction((prev) => ({ ...prev, [key]: false }));
+    }
+  };
+
   const handleDownloadCF = async (id: number) => {
     try {
       const data = await awsConnectionService.getCloudformationTemplate(id);
@@ -727,8 +744,13 @@ export function AWSConnectionPage() {
                       <Download className="mr-1.5 h-3.5 w-3.5" />
                       CloudFormation
                     </Button>
-                    <Button onClick={() => awsConnectionService.discoverInfrastructure(connection.id).then(() => queryClient.invalidateQueries({ queryKey: ["aws-connections"] }))} variant="outline" size="sm" disabled={connection.connection_status !== "CONNECTED"}>
-                      <RefreshCw className="mr-1.5 h-3.5 w-3.5" /> Refresh Infrastructure
+                    <Button onClick={() => handleDiscoverInfrastructure(connection.id)} variant="outline" size="sm" disabled={connection.connection_status !== "CONNECTED" || loadingAction[`discover-${connection.id}`]}>
+                      {loadingAction[`discover-${connection.id}`] ? (
+                        <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+                      ) : (
+                        <RefreshCw className="mr-1.5 h-3.5 w-3.5" />
+                      )}
+                      {loadingAction[`discover-${connection.id}`] ? "Refreshing..." : "Refresh Infrastructure"}
                     </Button>
                   </div>
 

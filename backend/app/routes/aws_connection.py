@@ -169,5 +169,11 @@ def discover_infrastructure(aws_connection_id: int):
     try:
         connection = infrastructure_discovery_service.discover(aws_connection_id, payload.get("stack_name"))
     except InfrastructureDiscoveryError as exc:
-        return jsonify({"error": {"message": str(exc)}}), 422
+        return jsonify({
+            "error": {
+                "message": str(exc),
+                "aws_connection_id": aws_connection_id,
+                "stack_name": payload.get("stack_name") or "CloudBridgecf",
+            }
+        }), 422
     return jsonify({"status": "READY", "aws_connection_id": connection.id, "account_id": connection.aws_account_id, "region": connection.aws_region, "stack_name": connection.cloudformation_stack_name, "orchestrator_lambda_arn": connection.orchestrator_lambda_arn, "worker_lambda_arn": connection.worker_lambda_arn, "validation_lambda_arn": connection.validation_lambda_arn, "dynamodb_table_name": connection.dynamodb_table_name}), 200
