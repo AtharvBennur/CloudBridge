@@ -267,7 +267,7 @@ export function MigrationWizard({ onSubmit, isSubmitting }: MigrationWizardProps
                       Advanced Defaults
                     </h4>
                     <p className="mt-1 text-xs text-muted-foreground">
-                      The migration engine runs on AWS Lambda for serverless execution. Checkpoints are created automatically every chunk batch for rollback safety.
+                      The migration engine will use AWS Lambda functions for serverless execution. Migration progress is tracked in DynamoDB with automatic retry for failed chunks.
                     </p>
                   </div>
                 </>

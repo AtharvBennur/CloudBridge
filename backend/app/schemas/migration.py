@@ -29,7 +29,7 @@ class CreateMigrationRequest:
     source_database: str | None = None
     destination_database: str | None = None
     description: str | None = None
-    aws_connection_id: int | None = None
+    aws_connection_id: int
     source_database_config_id: int | None = None
     destination_database_config_id: int | None = None
 
@@ -50,6 +50,15 @@ class CreateMigrationRequest:
         if not isinstance(job_name, str) or not job_name.strip():
             raise ValueError("Job name is required.")
 
+        # Require AWS connection ID for Lambda migration execution
+        if aws_connection_id is None or aws_connection_id == "":
+            raise ValueError("AWS connection ID is required for Lambda migration execution.")
+        if not isinstance(aws_connection_id, int):
+            try:
+                aws_connection_id = int(aws_connection_id)
+            except (TypeError, ValueError):
+                raise ValueError("AWS connection ID must be an integer.")
+
         # Require database config IDs OR database names for flexibility
         if source_database_config_id is None or source_database_config_id == "":
             if source_database is None or source_database == "":
@@ -69,14 +78,12 @@ class CreateMigrationRequest:
             raise ValueError("Description must be a string.")
 
         try:
-            if aws_connection_id is not None:
-                aws_connection_id = int(aws_connection_id)
             if source_database_config_id is not None:
                 source_database_config_id = int(source_database_config_id)
             if destination_database_config_id is not None:
                 destination_database_config_id = int(destination_database_config_id)
         except (TypeError, ValueError) as exc:
-            raise ValueError("Connection and database config IDs must be integers.") from exc
+            raise ValueError("Database config IDs must be integers.") from exc
 
         return cls(
             job_name=job_name.strip(),

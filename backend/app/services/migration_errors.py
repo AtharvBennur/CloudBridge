@@ -1,4 +1,4 @@
-"""Structured error types for ECS migration operations.
+"""Structured error types for Lambda migration operations.
 
 Provides typed error responses with stage, service, resource, and retryability
 information instead of generic string messages.
@@ -14,8 +14,8 @@ from typing import Any
 class MigrationError(Exception):
     """Structured error returned by migration operations."""
 
-    stage: str  # e.g., "ecr_push", "task_definition", "run_task", "resource_discovery"
-    aws_service: str  # e.g., "ecr", "ecs", "iam", "ec2", "logs"
+    stage: str  # e.g., "lambda_invocation", "dynamodb_write", "sqs_send", "schema_discovery"
+    aws_service: str  # e.g., "lambda", "dynamodb", "sqs", "iam", "ec2", "logs"
     resource: str  # e.g., "cloudbridge-migration-worker", "arn:aws:..."
     error_code: str  # AWS error code or internal code
     message: str  # Human-readable message
@@ -43,67 +43,34 @@ class MigrationError(Exception):
 
 # ── Factory functions for common errors ────────────────────────────────────
 
-def ecr_repository_error(message: str, repo_name: str, retryable: bool = True) -> MigrationError:
+def lambda_invocation_error(message: str, function_name: str, retryable: bool = True) -> MigrationError:
     return MigrationError(
-        stage="ecr_repository",
-        aws_service="ecr",
-        resource=repo_name,
-        error_code="ECR_REPOSITORY_ERROR",
+        stage="lambda_invocation",
+        aws_service="lambda",
+        resource=function_name,
+        error_code="LAMBDA_INVOCATION_FAILED",
         message=message,
         retryable=retryable,
     )
 
 
-def ecr_push_error(message: str, image_uri: str, retryable: bool = True) -> MigrationError:
+def dynamodb_write_error(message: str, table_name: str, retryable: bool = True) -> MigrationError:
     return MigrationError(
-        stage="ecr_push",
-        aws_service="ecr",
-        resource=image_uri,
-        error_code="ECR_PUSH_FAILED",
+        stage="dynamodb_write",
+        aws_service="dynamodb",
+        resource=table_name,
+        error_code="DYNAMODB_WRITE_FAILED",
         message=message,
         retryable=retryable,
     )
 
 
-def ecr_auth_error(message: str, retryable: bool = True) -> MigrationError:
+def sqs_send_error(message: str, queue_url: str, retryable: bool = True) -> MigrationError:
     return MigrationError(
-        stage="ecr_auth",
-        aws_service="ecr",
-        resource="ecr.amazonaws.com",
-        error_code="ECR_AUTH_FAILED",
-        message=message,
-        retryable=retryable,
-    )
-
-
-def ecs_run_task_error(message: str, cluster: str, retryable: bool = True) -> MigrationError:
-    return MigrationError(
-        stage="run_task",
-        aws_service="ecs",
-        resource=cluster,
-        error_code="ECS_RUN_TASK_FAILED",
-        message=message,
-        retryable=retryable,
-    )
-
-
-def ecs_describe_tasks_error(message: str, task_arn: str, retryable: bool = True) -> MigrationError:
-    return MigrationError(
-        stage="describe_tasks",
-        aws_service="ecs",
-        resource=task_arn,
-        error_code="ECS_DESCRIBE_FAILED",
-        message=message,
-        retryable=retryable,
-    )
-
-
-def task_definition_error(message: str, family: str, retryable: bool = False) -> MigrationError:
-    return MigrationError(
-        stage="task_definition",
-        aws_service="ecs",
-        resource=family,
-        error_code="TASK_DEFINITION_ERROR",
+        stage="sqs_send",
+        aws_service="sqs",
+        resource=queue_url,
+        error_code="SQS_SEND_FAILED",
         message=message,
         retryable=retryable,
     )
@@ -142,13 +109,23 @@ def log_stream_error(message: str, log_group: str, retryable: bool = True) -> Mi
     )
 
 
-def container_error(message: str, exit_code: int | None = None, retryable: bool = False) -> MigrationError:
+def lambda_function_error(message: str, function_name: str, retryable: bool = False) -> MigrationError:
     return MigrationError(
-        stage="container_execution",
-        aws_service="ecs",
-        resource="migration-worker",
-        error_code="CONTAINER_ERROR",
+        stage="lambda_execution",
+        aws_service="lambda",
+        resource=function_name,
+        error_code="LAMBDA_FUNCTION_ERROR",
         message=message,
         retryable=retryable,
-        details={"exitCode": exit_code} if exit_code is not None else {},
+    )
+
+
+def schema_discovery_error(message: str, database_name: str, retryable: bool = True) -> MigrationError:
+    return MigrationError(
+        stage="schema_discovery",
+        aws_service="lambda",
+        resource=database_name,
+        error_code="SCHEMA_DISCOVERY_FAILED",
+        message=message,
+        retryable=retryable,
     )
