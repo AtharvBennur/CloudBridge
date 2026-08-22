@@ -1,6 +1,9 @@
 from datetime import datetime
 import hmac
 
+import logging
+
+from botocore.exceptions import ClientError
 from flask import Blueprint, jsonify, request, current_app
 
 from app.extensions import db, socketio
@@ -12,6 +15,19 @@ from app.services.lambda_migration_service import LambdaMigrationService
 
 migration_engine_bp = Blueprint("migration_engine", __name__, url_prefix="/migration-engine")
 lambda_migration_service = LambdaMigrationService()
+logger = logging.getLogger(__name__)
+
+
+def _error_payload(exc: Exception) -> dict:
+    error_code = None
+    response = getattr(exc, "response", None)
+    if isinstance(response, dict):
+        error_code = (response.get("Error", {}) or {}).get("Code")
+    if not error_code and hasattr(exc, "aws_error_code"):
+        error_code = exc.aws_error_code
+    if not error_code and isinstance(exc, ClientError):
+        error_code = exc.response.get("Error", {}).get("Code")
+    return {"error": {"message": str(exc), "aws_error_code": error_code}}
 
 
 @migration_engine_bp.post("/start")
@@ -39,7 +55,7 @@ def start_migration():
             migration_id=migration_id,
             aws_connection_id=aws_connection_id
         )
-        
+
         invocation = lambda_migration_service.launch_migration(lambda_migration)
 
         return jsonify({
@@ -53,8 +69,9 @@ def start_migration():
             "chunk_support": True,
             "retry_support": True,
         }), 200
-    except Exception as e:
-        return jsonify({"error": {"message": str(e)}}), 500
+    except Exception as exc:
+        logger.exception("Start migration failed for migration %s", migration_id)
+        return jsonify(_error_payload(exc)), 500
 
 
 @migration_engine_bp.post("/checkpoint")

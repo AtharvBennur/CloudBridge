@@ -22,6 +22,7 @@ import { StatusBadge } from "@/components/migrations/StatusBadge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { migrationService } from "@/services/migrationService";
+import { preflightService } from "@/services/preflightService";
 import { useToast } from "@/components/ui/toast";
 import { websocketService } from "@/services/websocketService";
 import { env } from "@/lib/env";
@@ -86,13 +87,26 @@ export function MigrationDetailPage() {
   });
 
   const startMutation = useMutation({
-    mutationFn: () => migrationService.start(migrationId, migrationQuery.data?.aws_connection_id ?? undefined),
+    mutationFn: async () => {
+      const awsConnectionId = migrationQuery.data?.aws_connection_id ?? undefined;
+      if (awsConnectionId === undefined) {
+        throw new Error("No AWS connection is linked to this migration.");
+      }
+      const readiness = await preflightService.checkLambdaReadiness({ aws_connection_id: awsConnectionId });
+      const blocked = Object.entries(readiness.functions).filter(([, value]) => value.status !== "READY");
+      if (blocked.length > 0) {
+        const message = blocked.map(([name, value]) => `${name}: ${value.message}`).join(" • ");
+        throw new Error(message);
+      }
+      return migrationService.start(migrationId, awsConnectionId);
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["migration", migrationId] });
       toast({ title: "Migration started", description: "Migration is now running on Lambda", variant: "success" });
     },
     onError: (error: any) => {
-      toast({ title: "Failed to start migration", description: error.message, variant: "destructive" });
+      const backendMessage = error?.response?.data?.error?.message || error?.message || "Failed to start migration.";
+      toast({ title: "Failed to start migration", description: backendMessage, variant: "destructive" });
     },
   });
 

@@ -66,16 +66,26 @@ export function ObservabilityPage() {
   const latestPendingMigration = pendingMigrations.length > 0 ? pendingMigrations[0] : null;
 
   const startMigrationMutation = useMutation({
-    mutationFn: (migrationId: number) => {
+    mutationFn: async (migrationId: number) => {
       const migration = migrations.find((m) => m.id === migrationId);
-      return migrationService.start(migrationId, migration?.aws_connection_id ?? undefined);
+      if (!migration?.aws_connection_id) {
+        throw new Error("No AWS connection is linked to this migration.");
+      }
+      const readiness = await import("@/services/preflightService").then(({ preflightService }) => preflightService.checkLambdaReadiness({ aws_connection_id: migration.aws_connection_id! }));
+      const blocked = Object.entries(readiness.functions).filter(([, value]) => value.status !== "READY");
+      if (blocked.length > 0) {
+        const message = blocked.map(([name, value]) => `${name}: ${value.message}`).join(" • ");
+        throw new Error(message);
+      }
+      return migrationService.start(migrationId, migration.aws_connection_id);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["migrations"] });
       toast({ title: "Migration started", description: "Migration is now running on Lambda", variant: "success" });
     },
     onError: (error: any) => {
-      toast({ title: "Failed to start migration", description: error.message, variant: "destructive" });
+      const backendMessage = error?.response?.data?.error?.message || error?.message || "Failed to start migration.";
+      toast({ title: "Failed to start migration", description: backendMessage, variant: "destructive" });
     },
   });
 

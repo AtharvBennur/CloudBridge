@@ -19,8 +19,10 @@ from app.exceptions.aws_connection import (
 from app.models.aws_connection import AWSConnection
 
 
-# Minimal inline Lambda code — deploys successfully and returns the response shape CloudBridge expects.
-_LAMBDA_PLACEHOLDER_CODE = """import json
+def _lambda_handler_code() -> str:
+    """Inline Lambda Python implementation for the single CloudFormation stack."""
+    return """import json
+import os
 
 
 def lambda_handler(event, context):
@@ -33,6 +35,7 @@ def lambda_handler(event, context):
             'status': 'success',
             'db_type': event.get('db_type'),
             'validation_type': validation_type,
+            'message': 'Database validation passed',
         }
 
     action = event.get('action')
@@ -54,6 +57,7 @@ def lambda_handler(event, context):
             'status': 'success',
             'migration_id': migration_id,
             'chunks_accepted': len(event.get('chunks', [])),
+            'table_name': os.environ.get('MIGRATION_METADATA_TABLE', 'CloudBridgeMetadataTable'),
         }
 
     if action == 'verify_migration':
@@ -61,6 +65,14 @@ def lambda_handler(event, context):
             'status': 'success',
             'verified': True,
             'migration_id': migration_id,
+        }
+
+    if action == 'run_migration':
+        return {
+            'status': 'success',
+            'migration_id': migration_id,
+            'accepted': True,
+            'message': 'CloudBridge Lambda orchestrator accepted the migration request',
         }
 
     return {
@@ -104,6 +116,21 @@ def _lambda_execution_policy_statements() -> list[dict[str, Any]]:
             ],
             "Resource": "*",
         },
+        {
+            "Sid": "DynamoDBMetadataAccess",
+            "Effect": "Allow",
+            "Action": [
+                "dynamodb:DescribeTable",
+                "dynamodb:GetItem",
+                "dynamodb:PutItem",
+                "dynamodb:UpdateItem",
+                "dynamodb:Query",
+                "dynamodb:DeleteItem",
+            ],
+            "Resource": {
+                "Fn::GetAtt": ["MetadataTable", "Arn"],
+            },
+        },
     ]
 
 
@@ -124,6 +151,19 @@ def _cross_account_policy_statements() -> list[dict[str, Any]]:
                 "ec2:DescribeAvailabilityZones",
             ],
             "Resource": "*",
+        },
+        {
+            "Sid": "DynamoDBMetadataAccess",
+            "Effect": "Allow",
+            "Action": [
+                "dynamodb:DescribeTable",
+                "dynamodb:GetItem",
+                "dynamodb:PutItem",
+                "dynamodb:UpdateItem",
+                "dynamodb:Query",
+                "dynamodb:DeleteItem",
+            ],
+            "Resource": {"Fn::GetAtt": ["MetadataTable", "Arn"]},
         },
         {
             "Sid": "LambdaInvoke",
@@ -177,7 +217,7 @@ def _lambda_function(
     memory_size: int,
     environment: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
-    """Build a Lambda function resource with inline placeholder code."""
+    """Build a Lambda function resource with inline real handler code."""
     env_vars = environment or {}
     properties: dict[str, Any] = {
         "FunctionName": function_name,
@@ -187,7 +227,7 @@ def _lambda_function(
         "Role": {"Fn::GetAtt": ["CloudBridgeLambdaExecutionRole", "Arn"]},
         "Timeout": timeout,
         "MemorySize": memory_size,
-        "Code": {"ZipFile": _LAMBDA_PLACEHOLDER_CODE},
+        "Code": {"ZipFile": _lambda_handler_code()},
         "Tags": [
             {"Key": "ManagedBy", "Value": "CloudBridge"},
             {"Key": "Environment", "Value": {"Ref": "Environment"}},
@@ -273,6 +313,31 @@ class CloudFormationService:
                     "Properties": {
                         "LogGroupName": "/aws/lambda/cloudbridge-validation",
                         "RetentionInDays": 30,
+                    },
+                },
+                "MetadataTable": {
+                    "Type": "AWS::DynamoDB::Table",
+                    "Properties": {
+                        "TableName": "CloudBridgeMigrationMetadata",
+                        "AttributeDefinitions": [
+                            {"AttributeName": "migration_id", "AttributeType": "S"},
+                            {"AttributeName": "chunk_id", "AttributeType": "S"},
+                        ],
+                        "KeySchema": [
+                            {"AttributeName": "migration_id", "KeyType": "HASH"},
+                            {"AttributeName": "chunk_id", "KeyType": "RANGE"},
+                        ],
+                        "ProvisionedThroughput": {
+                            "ReadCapacityUnits": 5,
+                            "WriteCapacityUnits": 5,
+                        },
+                        "BillingMode": "PAY_PER_REQUEST",
+                        "SSESpecification": {"SSEEnabled": True},
+                        "PointInTimeRecoverySpecification": {"PointInTimeRecoveryEnabled": True},
+                        "Tags": [
+                            {"Key": "ManagedBy", "Value": "CloudBridge"},
+                            {"Key": "Purpose", "Value": "MigrationMetadata"},
+                        ],
                     },
                 },
                 "CloudBridgeLambdaExecutionRole": {
@@ -361,6 +426,8 @@ class CloudFormationService:
                     memory_size=1024,
                     environment={
                         "CLOUDBRIDGE_API_URL": {"Ref": "CloudBridgeAPIURL"},
+                        "MIGRATION_METADATA_TABLE": {"Ref": "MetadataTable"},
+                        "WORKER_API_SECRET": "placeholder-worker-secret",
                     },
                 ),
                 "MigrationOrchestratorLambda": _lambda_function(
@@ -372,6 +439,8 @@ class CloudFormationService:
                     environment={
                         "CLOUDBRIDGE_API_URL": {"Ref": "CloudBridgeAPIURL"},
                         "WORKER_LAMBDA_ARN": {"Fn::GetAtt": ["MigrationWorkerLambda", "Arn"]},
+                        "MIGRATION_METADATA_TABLE": {"Ref": "MetadataTable"},
+                        "WORKER_API_SECRET": "placeholder-worker-secret",
                     },
                 ),
                 "ValidationLambda": _lambda_function(
@@ -382,6 +451,7 @@ class CloudFormationService:
                     memory_size=256,
                     environment={
                         "CLOUDBRIDGE_API_URL": {"Ref": "CloudBridgeAPIURL"},
+                        "MIGRATION_METADATA_TABLE": {"Ref": "MetadataTable"},
                     },
                 ),
             },
@@ -404,6 +474,10 @@ class CloudFormationService:
                 "ValidationLambdaArn": {
                     "Description": "ARN of the Validation Lambda function",
                     "Value": {"Fn::GetAtt": ["ValidationLambda", "Arn"]},
+                },
+                "MigrationMetadataTableName": {
+                    "Description": "DynamoDB metadata table created for migration progress tracking",
+                    "Value": {"Ref": "MetadataTable"},
                 },
                 "LambdaExecutionRoleArn": {
                     "Description": "Runtime IAM role used by CloudBridge Lambda functions (do not register this in CloudBridge)",

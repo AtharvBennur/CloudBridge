@@ -13,6 +13,7 @@ from app.extensions import db
 from app.models.aws_connection import AWSConnection
 from app.models.database_config import DatabaseConfig
 from app.schemas.database_config import CreateDatabaseConfigRequest, DatabaseConfigResponse, DeleteDatabaseConfigResponse
+from app.services.secrets_manager_service import SecretManagerService
 
 logger = logging.getLogger(__name__)
 
@@ -59,7 +60,21 @@ class DatabaseConfigService:
                     f"Database connection test failed. Unable to reach {create_request.host}:{create_request.port} via TCP."
                 )
 
-            # 3. Store credentials directly in database (no Secrets Manager)
+            # 3. Persist a secret reference when the customer config is backed by AWS Secrets Manager.
+            secret_arn = create_request.secret_arn
+            secret_name = create_request.secret_name
+
+            if create_request.aws_connection_id and not secret_arn and create_request.purpose == "SOURCE":
+                secret = SecretManagerService.create(
+                    name=f"cloudbridge/{create_request.name.lower().replace(' ', '-')}",
+                    value={"username": create_request.username, "password": create_request.password or ""},
+                )
+                if isinstance(secret, dict):
+                    secret_arn = secret.get("arn") or secret_arn
+                    secret_name = secret.get("name") or secret_name
+            elif create_request.aws_connection_id and secret_name and not secret_arn:
+                secret_arn = SecretManagerService.validate(secret_name)
+
             config = DatabaseConfig(
                 name=create_request.name,
                 database_type=create_request.database_type,
@@ -70,8 +85,8 @@ class DatabaseConfigService:
                 database_name=create_request.database_name,
                 purpose=create_request.purpose,
                 aws_connection_id=create_request.aws_connection_id,
-                secret_arn=None,
-                secret_name=None,
+                secret_arn=secret_arn,
+                secret_name=secret_name,
                 provisioning_config=create_request.provisioning_config,
             )
             db.session.add(config)

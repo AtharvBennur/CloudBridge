@@ -85,42 +85,75 @@ class LambdaMigrationService:
     def __init__(self, aws_client: AWSClient | None = None) -> None:
         self._aws_client = aws_client or AWSClient()
 
+    @staticmethod
+    def _arn_region(arn: str | None) -> str | None:
+        if not arn:
+            return None
+        parts = arn.split(":")
+        return parts[3] if len(parts) > 3 else None
+
     def _resolve_lambda_arn(
         self,
         aws_connection: AWSConnection,
         function_name: str,
         env_override_key: str,
     ) -> str:
-        """Resolve a Lambda ARN from env override or the customer CloudFormation stack naming."""
+        """Resolve a Lambda ARN from an explicit env override or the database-backed ARN."""
         override = os.environ.get(env_override_key, "").strip()
         if override:
+            logger.warning("Using manual Lambda ARN override for %s from %s", function_name, env_override_key)
             return override
         return function_name
 
     def _resolve_lambda_arns(self, aws_connection: AWSConnection) -> dict[str, str]:
-        if aws_connection.orchestrator_lambda_arn and aws_connection.worker_lambda_arn and aws_connection.validation_lambda_arn:
-            return {"orchestrator": aws_connection.orchestrator_lambda_arn, "worker": aws_connection.worker_lambda_arn, "validation": aws_connection.validation_lambda_arn}
-        # Production resources must be discovered per AWS connection. Environment
-        # values are retained only for explicit local-development fallback.
-        if current_app.config.get("ENV_NAME") != "development":
+        current = {
+            "orchestrator": aws_connection.orchestrator_lambda_arn,
+            "worker": aws_connection.worker_lambda_arn,
+            "validation": aws_connection.validation_lambda_arn,
+        }
+
+        discovered = {}
+        manual_overrides = {
+            "orchestrator": os.environ.get("CLOUDBRIDGE_ORCHESTRATOR_LAMBDA_ARN", "").strip(),
+            "worker": os.environ.get("CLOUDBRIDGE_WORKER_LAMBDA_ARN", "").strip(),
+            "validation": os.environ.get("CLOUDBRIDGE_VALIDATION_LAMBDA_ARN", "").strip(),
+        }
+        if any(manual_overrides.values()):
+            logger.warning("Using manual Lambda ARN override(s): %s", manual_overrides)
+            for key, value in manual_overrides.items():
+                if value:
+                    discovered[key] = value
+
+        missing_values = any(not current.get(name) for name in ("orchestrator", "worker", "validation"))
+        if missing_values:
+            discovered.update({key: value for key, value in current.items() if value})
+
             from app.services.infrastructure_discovery_service import InfrastructureDiscoveryService, InfrastructureDiscoveryError
             try:
                 InfrastructureDiscoveryService(self._aws_client).discover(aws_connection.id)
             except InfrastructureDiscoveryError as exc:
                 raise MigrationError(str(exc)) from exc
             db.session.refresh(aws_connection)
-            return {"orchestrator": aws_connection.orchestrator_lambda_arn, "worker": aws_connection.worker_lambda_arn, "validation": aws_connection.validation_lambda_arn}
-        return {
-            "orchestrator": self._resolve_lambda_arn(
-                aws_connection, ORCHESTRATOR_FUNCTION, "CLOUDBRIDGE_ORCHESTRATOR_LAMBDA_ARN"
-            ),
-            "worker": self._resolve_lambda_arn(
-                aws_connection, WORKER_FUNCTION, "CLOUDBRIDGE_WORKER_LAMBDA_ARN"
-            ),
-            "validation": self._resolve_lambda_arn(
-                aws_connection, VALIDATION_FUNCTION, "CLOUDBRIDGE_VALIDATION_LAMBDA_ARN"
-            ),
+            discovered = {
+                "orchestrator": aws_connection.orchestrator_lambda_arn,
+                "worker": aws_connection.worker_lambda_arn,
+                "validation": aws_connection.validation_lambda_arn,
+            }
+
+        resolved = {
+            "orchestrator": discovered.get("orchestrator") or current.get("orchestrator") or self._resolve_lambda_arn(aws_connection, ORCHESTRATOR_FUNCTION, "CLOUDBRIDGE_ORCHESTRATOR_LAMBDA_ARN"),
+            "worker": discovered.get("worker") or current.get("worker") or self._resolve_lambda_arn(aws_connection, WORKER_FUNCTION, "CLOUDBRIDGE_WORKER_LAMBDA_ARN"),
+            "validation": discovered.get("validation") or current.get("validation") or self._resolve_lambda_arn(aws_connection, VALIDATION_FUNCTION, "CLOUDBRIDGE_VALIDATION_LAMBDA_ARN"),
         }
+
+        for function_name, arn in resolved.items():
+            if not arn:
+                raise MigrationError(f"Unable to resolve Lambda ARN for {function_name}.")
+            arn_region = self._arn_region(arn)
+            if arn_region and arn_region != aws_connection.aws_region:
+                raise MigrationError(f"Lambda function region ({arn_region}) does not match AWS connection region ({aws_connection.aws_region}).")
+
+        return resolved
 
     def _parse_lambda_response(self, response: dict[str, Any]) -> dict[str, Any]:
         if response.get("FunctionError"):
@@ -183,8 +216,7 @@ class LambdaMigrationService:
         try:
             credentials = self._aws_client.assume_role(connection.role_arn, connection.external_id, connection.aws_region)
             lambda_client = self._aws_client.get_boto3_client("lambda", credentials=credentials, region=connection.aws_region)
-            
-            # Pass database credentials directly from database config (no Secrets Manager)
+
             source_credentials = {
                 "engine": source.database_type.lower(),
                 "host": source.host,
@@ -201,7 +233,7 @@ class LambdaMigrationService:
                 "password": destination.password,
                 "database": destination.database_name,
             }
-            
+
             arns = self._resolve_lambda_arns(connection)
             response = self._invoke_lambda(lambda_client, arns["orchestrator"], {
                 "action": "run_migration",
@@ -212,8 +244,7 @@ class LambdaMigrationService:
                 "chunk_size": migration.chunk_size,
             }, invocation_type="Event")
         except Exception as exc:
-            # Do not present a false "started" state when STS, Secrets Manager,
-            # or Invoke rejects the request.
+            logger.exception("Lambda migration launch failed for migration %s", migration.id)
             db.session.rollback()
             migration.status = MigrationStatus.FAILED
             migration.error_message = str(exc)

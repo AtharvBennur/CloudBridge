@@ -19,11 +19,31 @@ class InfrastructureDiscoveryService:
     def __init__(self, aws_client: AWSClient | None = None):
         self.aws_client = aws_client or AWSClient()
 
+    @staticmethod
+    def _parse_arn_region(arn: str | None) -> str | None:
+        if not arn:
+            return None
+        parts = arn.split(":")
+        return parts[3] if len(parts) > 3 else None
+
+    @staticmethod
+    def _parse_arn_account(arn: str | None) -> str | None:
+        if not arn:
+            return None
+        parts = arn.split(":")
+        return parts[4] if len(parts) > 4 else None
+
     def discover(self, aws_connection_id: int, stack_name: str | None = None) -> AWSConnection:
         connection = db.session.get(AWSConnection, aws_connection_id)
         if not connection or not connection.role_arn:
             raise InfrastructureDiscoveryError("AWS connection and assumed-role ARN are required before infrastructure discovery.")
-        name = (stack_name or connection.cloudformation_stack_name or "CloudBridgecf").strip()
+
+        candidate_name = stack_name if stack_name is not None else connection.cloudformation_stack_name
+        name = (candidate_name or "").strip()
+        if not name:
+            raise InfrastructureDiscoveryError(
+                "No CloudFormation stack name recorded for this connection. Run infrastructure discovery with an explicit stack_name, or redeploy via /aws-connections/<id>/cloudformation-template."
+            )
         try:
             credentials = self.aws_client.assume_role(connection.role_arn, connection.external_id, connection.aws_region)
             cfn = self.aws_client.get_boto3_client("cloudformation", credentials=credentials, region=connection.aws_region)
@@ -47,6 +67,20 @@ class InfrastructureDiscoveryService:
         for output, attribute in self.REQUIRED.items():
             setattr(connection, attribute, outputs[output])
         connection.cloudformation_stack_name = name
+
+        for key, attr in {
+            "MigrationOrchestratorLambdaArn": "orchestrator_lambda_arn",
+            "MigrationWorkerLambdaArn": "worker_lambda_arn",
+            "ValidationLambdaArn": "validation_lambda_arn",
+        }.items():
+            arn = getattr(connection, attr)
+            arn_region = self._parse_arn_region(arn)
+            arn_account = self._parse_arn_account(arn)
+            if arn_region and arn_region != connection.aws_region:
+                raise InfrastructureDiscoveryError(f"Discovered {attr} ARN region ({arn_region}) does not match AWS connection region ({connection.aws_region}).")
+            if arn_account and arn_account != connection.aws_account_id:
+                raise InfrastructureDiscoveryError(f"Discovered {attr} ARN account ({arn_account}) does not match AWS connection account ({connection.aws_account_id}).")
+
         connection.infrastructure_discovered_at = datetime.utcnow()
         connection.infrastructure_last_verified_at = datetime.utcnow()
         db.session.commit()

@@ -50,14 +50,16 @@ class CreateMigrationRequest:
         if not isinstance(job_name, str) or not job_name.strip():
             raise ValueError("Job name is required.")
 
-        # Require AWS connection ID for Lambda migration execution
-        if aws_connection_id is None or aws_connection_id == "":
-            raise ValueError("AWS connection ID is required for Lambda migration execution.")
-        if not isinstance(aws_connection_id, int):
-            try:
-                aws_connection_id = int(aws_connection_id)
-            except (TypeError, ValueError):
-                raise ValueError("AWS connection ID must be an integer.")
+        # AWS connection is optional for legacy/basic migration creation flows.
+        # Lambda orchestration can still consume it when provided.
+        if aws_connection_id is not None and aws_connection_id != "":
+            if not isinstance(aws_connection_id, int):
+                try:
+                    aws_connection_id = int(aws_connection_id)
+                except (TypeError, ValueError):
+                    raise ValueError("AWS connection ID must be an integer.")
+        else:
+            aws_connection_id = None
 
         # Require database config IDs OR database names for flexibility
         if source_database_config_id is None or source_database_config_id == "":

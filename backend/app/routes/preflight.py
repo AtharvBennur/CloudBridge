@@ -42,3 +42,22 @@ def run_preflight():
         return jsonify({"error": {"message": str(exc)}}), 400
     except Exception as exc:
         return jsonify({"error": {"message": f"Pre-flight error: {exc}"}}), 500
+
+
+@preflight_bp.post('/lambda')
+@preflight_bp.post('/lambda-ready')
+@preflight_bp.post('/migration-readiness')
+@login_required
+def lambda_readiness_check():
+    payload = request.get_json(silent=True) or {}
+    aws_connection_id = payload.get("aws_connection_id")
+    if aws_connection_id is None:
+        return jsonify({"error": {"message": "aws_connection_id is required."}}), 400
+
+    try:
+        report = preflight_service.check_lambda_readiness(int(aws_connection_id))
+        return jsonify(report), 200
+    except ValueError as exc:
+        return jsonify({"error": {"message": str(exc)}}), 400
+    except Exception as exc:
+        return jsonify({"error": {"message": f"Lambda readiness check failed: {exc}"}}), 500

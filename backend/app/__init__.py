@@ -20,6 +20,7 @@ from app.routes.aws_connection import aws_connection_bp
 from app.routes.database_config import database_config_bp
 from app.routes.health import health_bp
 from app.routes.migration import migration_bp
+from app.routes.migration_legacy import legacy_ecs_bp
 from app.routes.migration_engine import migration_engine_bp
 from app.routes.preflight import preflight_bp
 from app.routes.cdc import cdc_bp
@@ -66,6 +67,7 @@ def register_blueprints(app: Flask) -> None:
     app.register_blueprint(health_bp)
     app.register_blueprint(auth_bp)
     app.register_blueprint(migration_bp)
+    app.register_blueprint(legacy_ecs_bp)
     app.register_blueprint(migration_engine_bp)
     app.register_blueprint(aws_connection_bp)
     app.register_blueprint(database_config_bp)
