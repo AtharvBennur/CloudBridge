@@ -25,6 +25,9 @@ def test_generate_template_includes_dynamodb_and_required_outputs() -> None:
 
     resources = template["Resources"]
     assert "MetadataTable" in resources
+    metadata_properties = resources["MetadataTable"]["Properties"]
+    assert metadata_properties["BillingMode"] == "PAY_PER_REQUEST"
+    assert "ProvisionedThroughput" not in metadata_properties
     assert "MigrationOrchestratorLambda" in resources
     assert "MigrationWorkerLambda" in resources
     assert "ValidationLambda" in resources

@@ -327,10 +327,6 @@ class CloudFormationService:
                             {"AttributeName": "migration_id", "KeyType": "HASH"},
                             {"AttributeName": "chunk_id", "KeyType": "RANGE"},
                         ],
-                        "ProvisionedThroughput": {
-                            "ReadCapacityUnits": 5,
-                            "WriteCapacityUnits": 5,
-                        },
                         "BillingMode": "PAY_PER_REQUEST",
                         "SSESpecification": {"SSEEnabled": True},
                         "PointInTimeRecoverySpecification": {"PointInTimeRecoveryEnabled": True},
