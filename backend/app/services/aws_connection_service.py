@@ -40,6 +40,7 @@ from app.schemas.aws_connection import (
     UpdateAWSConnectionRequest,
 )
 from app.utils.aws_client import AWSClient
+from app.services.infrastructure_discovery_service import InfrastructureDiscoveryError, InfrastructureDiscoveryService
 
 
 class AWSConnectionService:
@@ -204,6 +205,15 @@ class AWSConnectionService:
             connection.last_validated_at = datetime.utcnow()
             connection.updated_at = datetime.utcnow()
             db.session.commit()
+
+            # A successful STS connection is the prerequisite for discovering
+            # the Lambda and DynamoDB outputs from the customer's stack.
+            try:
+                InfrastructureDiscoveryService(self._aws_client).discover(connection.id)
+            except InfrastructureDiscoveryError as exc:
+                logger = self._logger or current_app.logger
+                logger.warning("Infrastructure discovery pending for AWS connection %s: %s", connection_id, exc)
+
             self._log_info("Connection test passed for AWS connection %s", connection_id)
             return {
                 "status": AWSConnectionStatus.CONNECTED,
@@ -211,6 +221,7 @@ class AWSConnectionService:
                 "step": "connect",
                 "aws_connection_id": connection_id,
                 "session_assumed": True,
+                "infrastructure_discovered": bool(connection.orchestrator_lambda_arn and connection.dynamodb_table_name),
                 "details": result,
             }
 

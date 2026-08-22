@@ -57,7 +57,9 @@ class DatabaseConfigService:
             if not connected:
                 self._log_info(f"Database TCP check failed for {create_request.host}:{create_request.port}")
                 raise DatabaseConfigValidationError(
-                    f"Database connection test failed. Unable to reach {create_request.host}:{create_request.port} via TCP."
+                    f"Database connection test failed. Unable to reach {create_request.host}:{create_request.port} via TCP. "
+                    "Confirm the database is running and listening on this port, and allow inbound traffic from the "
+                    "CloudBridge backend/Render outbound IP in the RDS or EC2 security group. Public accessibility alone is not sufficient."
                 )
 
             # 3. Persist a secret reference when the customer config is backed by AWS Secrets Manager.
