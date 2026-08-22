@@ -33,6 +33,10 @@ def test_generate_template_includes_dynamodb_and_required_outputs() -> None:
     assert "ValidationLambda" in resources
     assert "_LAMBDA_PLACEHOLDER_CODE" not in str(template)
 
+    role_policy = resources["CloudBridgeMigrationRole"]["Properties"]["Policies"][0]["PolicyDocument"]["Statement"]
+    discovery_statement = next(item for item in role_policy if item.get("Sid") == "CloudFormationDiscovery")
+    assert discovery_statement["Action"] == ["cloudformation:DescribeStacks"]
+
     outputs = template["Outputs"]
     assert set(
         [

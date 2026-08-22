@@ -153,6 +153,14 @@ def _cross_account_policy_statements() -> list[dict[str, Any]]:
             "Resource": "*",
         },
         {
+            "Sid": "CloudFormationDiscovery",
+            "Effect": "Allow",
+            "Action": ["cloudformation:DescribeStacks"],
+            "Resource": {
+                "Fn::Sub": "arn:aws:cloudformation:${AWS::Region}:${AWS::AccountId}:stack/CloudBridgecf/*",
+            },
+        },
+        {
             "Sid": "DynamoDBMetadataAccess",
             "Effect": "Allow",
             "Action": [
