@@ -27,7 +27,8 @@ export function PreflightPage() {
 
   return <div className="mx-auto max-w-6xl space-y-6">
     <section className="rounded-3xl border border-border/70 bg-card/85 p-6 shadow-soft">
-      <div className="flex items-start gap-3"><div className="rounded-2xl bg-primary/10 p-3 text-primary"><ClipboardCheck className="h-6 w-6" /></div><div><Badge variant="indigo">Readiness gate</Badge><h1 className="mt-3 text-3xl font-semibold tracking-tight">Pre-flight validation</h1><p className="mt-2 text-sm text-muted-foreground">Verify cross-account access, secrets, permissions, region, and database reachability before a migration starts.</p></div></div>
+      <div className="flex items-start gap-3"><div className="rounded-2xl bg-primary/10 p-3 text-primary"><ClipboardCheck className="h-6 w-6" /></div><div><Badge variant="indigo">Readiness gate</Badge><h1 className="mt-3 text-3xl font-semibold tracking-tight">Pre-flight validation</h1>
+      <p className="mt-2 text-sm text-muted-foreground">Verify cross-account access, permissions, region, and database reachability before a migration starts.</p></div></div>
     </section>
     <Card className="shadow-soft"><CardHeader><CardTitle>Validate migration prerequisites</CardTitle><CardDescription>Choose the infrastructure associated with this migration.</CardDescription></CardHeader><CardContent className="grid gap-4 md:grid-cols-3">
       <Selector label="AWS connection" value={connectionId} onChange={setConnectionId} options={connections.data?.map((item) => ({ value: String(item.id), label: `${item.aws_account_id} · ${item.aws_region}` })) ?? []} />

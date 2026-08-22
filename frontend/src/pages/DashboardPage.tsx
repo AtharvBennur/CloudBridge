@@ -168,12 +168,8 @@ export function DashboardPage() {
               STS AssumeRole Verified
             </div>
             <div className="rounded-xl border bg-background/50 px-3 py-1.5 text-xs font-medium text-foreground flex items-center gap-1.5 hover:border-blue-400/50 hover:bg-blue-500/5 transition-all duration-200">
-              <KeyRound className="h-3.5 w-3.5 text-blue-500" />
-              Secrets Manager Active
-            </div>
-            <div className="rounded-xl border bg-background/50 px-3 py-1.5 text-xs font-medium text-foreground flex items-center gap-1.5 hover:border-violet-400/50 hover:bg-violet-500/5 transition-all duration-200">
-              <Zap className="h-3.5 w-3.5 text-violet-500" />
-              Lambda Architecture Active
+              <Zap className="h-3.5 w-3.5 text-blue-500" />
+              Lambda Active
             </div>
           </div>
         </div>

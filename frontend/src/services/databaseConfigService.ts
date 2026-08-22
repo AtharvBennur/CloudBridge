@@ -15,8 +15,6 @@ export interface DatabaseConfig {
   database_name: string | null;
   purpose: string;
   aws_connection_id: number | null;
-  secret_arn: string | null;
-  secret_name: string | null;
   provisioning_config: string | null;
   created_at: string;
   updated_at: string;
@@ -28,12 +26,10 @@ export interface CreateDatabaseConfigPayload {
   host: string;
   port: number;
   username: string;
-  password?: string;
+  password: string;
   purpose: string;
   database_name?: string;
   aws_connection_id?: number | null;
-  secret_arn?: string;
-  secret_name?: string;
   provisioning_config?: string;
 }
 

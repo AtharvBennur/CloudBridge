@@ -53,7 +53,7 @@ const faqItems = [
   {
     question: "How are credentials stored?",
     answer:
-      "Database credentials are encrypted and stored in your configured Secrets Manager. CloudBridge never stores plaintext passwords. All API communication uses TLS.",
+      "Database credentials are stored securely in the CloudBridge database. All API communication uses TLS for encryption.",
   },
   {
     question: "What is the approval workflow?",
@@ -284,10 +284,9 @@ export function HelpPage() {
             <div className="p-4 rounded-xl border border-border/50 bg-muted/20">
               <h4 className="font-semibold text-sm mb-2">Security Model</h4>
               <p className="text-xs text-muted-foreground">
-                All database credentials are stored in AWS Secrets Manager.
-                CloudBridge uses STS AssumeRole for cross-account access. No
-                plaintext secrets are ever stored or logged. All API traffic is
-                encrypted with TLS.
+                Database credentials are stored securely in the CloudBridge database.
+                CloudBridge uses STS AssumeRole for cross-account access. All API
+                traffic is encrypted with TLS.
               </p>
             </div>
           </CardContent>

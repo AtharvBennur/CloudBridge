@@ -11,7 +11,6 @@ from app.exceptions.aws_connection import (
     AWSConnectionNotFoundError,
     AWSConnectionValidationError,
 )
-from app.services.secrets_manager_service import SecretManagerError
 
 
 def register_error_handlers(app: Flask) -> None:
@@ -67,19 +66,6 @@ def register_error_handlers(app: Flask) -> None:
             }
         }
         return jsonify(response), 502
-
-    @app.errorhandler(SecretManagerError)
-    def handle_secret_manager_error(error: SecretManagerError):
-        app.logger.error("Secrets Manager error [%s]: %s", error.code, error.message)
-        status = 404 if error.code == "SECRET_NOT_FOUND" else 400 if error.code in ("ROLE_ARN_MISSING", "STS_ERROR") else 502
-        response = {
-            "error": {
-                "code": error.code,
-                "message": error.message,
-                "status": status,
-            }
-        }
-        return jsonify(response), status
 
     @app.errorhandler(Exception)
     def handle_unexpected_exception(error: Exception):

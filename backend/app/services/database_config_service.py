@@ -13,8 +13,6 @@ from app.extensions import db
 from app.models.aws_connection import AWSConnection
 from app.models.database_config import DatabaseConfig
 from app.schemas.database_config import CreateDatabaseConfigRequest, DatabaseConfigResponse, DeleteDatabaseConfigResponse
-from app.schemas.secret import SecretReferenceRequest, SecretWriteRequest
-from app.services.secrets_manager_service import SecretManagerError, SecretManagerService
 
 logger = logging.getLogger(__name__)
 
@@ -37,11 +35,10 @@ def test_tcp_connectivity(host: str, port: int, timeout: int = 5) -> bool:
 
 
 class DatabaseConfigService:
-    """Coordinates database onboarding configuration persistence and AWS Secrets integration."""
+    """Coordinates database onboarding configuration persistence."""
 
-    def __init__(self, logger: Any | None = None, secrets_service: SecretManagerService | None = None) -> None:
+    def __init__(self, logger: Any | None = None) -> None:
         self._logger = logger
-        self._secrets_service = secrets_service or SecretManagerService()
 
     def create(self, payload: dict[str, Any] | None) -> DatabaseConfigResponse:
         try:
@@ -62,51 +59,19 @@ class DatabaseConfigService:
                     f"Database connection test failed. Unable to reach {create_request.host}:{create_request.port} via TCP."
                 )
 
-            # 3. Store credentials or validate existing secret
-            secret_arn = create_request.secret_arn
-            secret_name = create_request.secret_name
-
-            if create_request.purpose == "SOURCE":
-                if not aws_connection:
-                    raise DatabaseConfigValidationError("aws_connection_id is required to onboard a source database.")
-                try:
-                    secret_arn, secret_name = self._store_secret_in_aws(
-                        aws_connection=aws_connection,
-                        db_name=create_request.name,
-                        db_type=create_request.database_type,
-                        host=create_request.host,
-                        port=create_request.port,
-                        username=create_request.username,
-                        password=create_request.password or "",
-                        database_name=create_request.database_name,
-                    )
-                    self._log_info(f"Stored database password in AWS Secrets Manager: {secret_arn}")
-                except SecretManagerError as exc:
-                    raise DatabaseConfigValidationError(f"AWS Secrets Manager error: {exc.message}") from exc
-
-            elif create_request.purpose == "DESTINATION":
-                if create_request.secret_arn or create_request.secret_name:
-                    if not aws_connection:
-                        raise DatabaseConfigValidationError("aws_connection_id is required to validate destination database secret.")
-                    try:
-                        secret_id = create_request.secret_arn or create_request.secret_name
-                        secret_arn = self._validate_existing_secret_in_aws(aws_connection, secret_id or "")
-                        self._log_info(f"Validated existing destination database secret: {secret_arn}")
-                    except SecretManagerError as exc:
-                        raise DatabaseConfigValidationError(f"AWS Secrets Manager validation failed: {exc.message}") from exc
-
+            # 3. Store credentials directly in database (no Secrets Manager)
             config = DatabaseConfig(
                 name=create_request.name,
                 database_type=create_request.database_type,
                 host=create_request.host,
                 port=create_request.port,
                 username=create_request.username,
-                password=create_request.password or "",  # Store password locally for ECS worker
+                password=create_request.password or "",
                 database_name=create_request.database_name,
                 purpose=create_request.purpose,
                 aws_connection_id=create_request.aws_connection_id,
-                secret_arn=secret_arn,
-                secret_name=secret_name,
+                secret_arn=None,
+                secret_name=None,
                 provisioning_config=create_request.provisioning_config,
             )
             db.session.add(config)
@@ -149,10 +114,6 @@ class DatabaseConfigService:
             config.purpose = payload["purpose"].strip().upper()
         if "aws_connection_id" in payload:
             config.aws_connection_id = payload["aws_connection_id"]
-        if "secret_arn" in payload:
-            config.secret_arn = payload["secret_arn"].strip() if isinstance(payload["secret_arn"], str) and payload["secret_arn"].strip() else None
-        if "secret_name" in payload:
-            config.secret_name = payload["secret_name"].strip() if isinstance(payload["secret_name"], str) and payload["secret_name"].strip() else None
         if "provisioning_config" in payload:
             config.provisioning_config = payload["provisioning_config"] if isinstance(payload["provisioning_config"], str) else None
 
@@ -166,69 +127,11 @@ class DatabaseConfigService:
         db.session.commit()
         return DeleteDatabaseConfigResponse(message="Database configuration deleted successfully.")
 
-    def create_secret(self, aws_connection_id: int, payload: dict[str, Any] | None) -> dict[str, str]:
-        try:
-            request = SecretWriteRequest.from_payload(payload)
-        except ValueError as exc:
-            raise DatabaseConfigValidationError(str(exc)) from exc
-        connection = self._get_connection(aws_connection_id)
-        result = self._secrets_service.create(connection, request.name, request.value, request.description)
-        self._log_info("Secret created in customer AWS Secrets Manager")
-        return result
-
-    def update_secret(self, aws_connection_id: int, secret_id: str, payload: dict[str, Any] | None) -> dict[str, str]:
-        try:
-            request = SecretWriteRequest.from_payload(payload)
-        except ValueError as exc:
-            raise DatabaseConfigValidationError(str(exc)) from exc
-        arn = self._secrets_service.update(self._get_connection(aws_connection_id), secret_id, request.value)
-        self._log_info("Secret updated in customer AWS Secrets Manager")
-        return {"arn": arn}
-
-    def validate_secret(self, aws_connection_id: int, payload: dict[str, Any] | None) -> dict[str, str]:
-        try:
-            request = SecretReferenceRequest.from_payload(payload)
-        except ValueError as exc:
-            raise DatabaseConfigValidationError(str(exc)) from exc
-        arn = self._secrets_service.validate(self._get_connection(aws_connection_id), request.secret_id)
-        self._log_info("Secret validated in customer AWS Secrets Manager")
-        return {"arn": arn, "status": "VALID"}
-
-    def delete_secret(self, aws_connection_id: int, secret_id: str) -> None:
-        self._secrets_service.delete(self._get_connection(aws_connection_id), secret_id)
-        self._log_info("Secret scheduled for deletion in customer AWS Secrets Manager")
-
-    @staticmethod
-    def _get_connection(aws_connection_id: int) -> AWSConnection:
-        connection = AWSConnection.query.get(aws_connection_id)
-        if connection is None:
-            raise DatabaseConfigNotFoundError(f"AWS connection {aws_connection_id} was not found.")
-        return connection
-
     def _get_existing_config(self, database_config_id: int) -> DatabaseConfig:
         config = DatabaseConfig.query.get(database_config_id)
         if config is None:
             raise DatabaseConfigNotFoundError(f"Database config {database_config_id} was not found.")
         return config
-
-    def _store_secret_in_aws(self, aws_connection, db_name: str, db_type: str, host: str, port: int, username: str, password: str, database_name: str | None = None) -> tuple[str, str]:
-        secret_payload = {
-            "engine": db_type.lower(),
-            "host": host,
-            "port": port,
-            "username": username,
-            "password": password,
-        }
-        if database_name:
-            secret_payload["dbname"] = database_name
-        secret_name = f"cloudbridge/db-config/{db_name.lower().replace(' ', '-')}-{int(datetime.utcnow().timestamp())}"
-        response = self._secrets_service.create(
-            aws_connection, secret_name, secret_payload, f"Database credentials for CloudBridge: {db_name}"
-        )
-        return response["arn"], response["name"]
-
-    def _validate_existing_secret_in_aws(self, aws_connection, secret_id: str) -> str:
-        return self._secrets_service.validate(aws_connection, secret_id)
 
     def _log_info(self, message: str, database_config_id: int | None = None, name: str | None = None) -> None:
         _logger = self._logger or current_app.logger

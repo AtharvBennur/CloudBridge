@@ -50,7 +50,6 @@ from app.models.lambda_migration import LambdaMigration, LambdaMigrationStatus, 
 from app.exceptions.migration import MigrationError, lambda_execution_error, lambda_validation_error
 from app.services.websocket_service import websocket_service
 from app.services.observability_service import observability_service
-from app.services.secrets_manager_service import SecretManagerService
 from app.utils.aws_client import AWSClient
 
 logger = logging.getLogger(__name__)
@@ -167,18 +166,6 @@ class LambdaMigrationService:
             return response
         return self._parse_lambda_response(response)
 
-    @staticmethod
-    def _database_secret(config: DatabaseConfig) -> dict[str, Any]:
-        """Return only the connection data needed by a Lambda from Secrets Manager."""
-        return {
-            "db_type": config.database_type,
-            "host": config.host,
-            "port": config.port,
-            "username": config.username,
-            "password": config.password,
-            "database_name": config.database_name,
-        }
-
     def launch_migration(self, lambda_migration: LambdaMigration) -> dict[str, Any]:
         """Invoke the orchestrator and persist the AWS acknowledgement before replying.
 
@@ -196,30 +183,32 @@ class LambdaMigrationService:
         try:
             credentials = self._aws_client.assume_role(connection.role_arn, connection.external_id, connection.aws_region)
             lambda_client = self._aws_client.get_boto3_client("lambda", credentials=credentials, region=connection.aws_region)
-            secret_service = SecretManagerService(self._aws_client)
-            prefix = os.environ.get("SECRETS_PREFIX", "cloudbridge/")
-            def ensure_secret(config: DatabaseConfig, suffix: str) -> str:
-                if config.secret_arn:
-                    return secret_service.update(connection, config.secret_arn, self._database_secret(config))
-                name = f"{prefix}migrations/{migration.id}/{suffix}"
-                try:
-                    result = secret_service.create(connection, name, self._database_secret(config), "CloudBridge migration connection")
-                    config.secret_arn = result["arn"]
-                    return result["arn"]
-                except Exception as exc:
-                    if "ResourceExistsException" not in str(exc):
-                        raise
-                    return secret_service.update(connection, name, self._database_secret(config))
-
-            source_secret_arn = ensure_secret(source, "source")
-            destination_secret_arn = ensure_secret(destination, "destination")
+            
+            # Pass database credentials directly from database config (no Secrets Manager)
+            source_credentials = {
+                "engine": source.database_type.lower(),
+                "host": source.host,
+                "port": source.port,
+                "username": source.username,
+                "password": source.password,
+                "database": source.database_name,
+            }
+            destination_credentials = {
+                "engine": destination.database_type.lower(),
+                "host": destination.host,
+                "port": destination.port,
+                "username": destination.username,
+                "password": destination.password,
+                "database": destination.database_name,
+            }
+            
             arns = self._resolve_lambda_arns(connection)
             response = self._invoke_lambda(lambda_client, arns["orchestrator"], {
                 "action": "run_migration",
                 "migration_id": migration.id,
                 "lambda_migration_id": lambda_migration.id,
-                "source_secret_arn": source_secret_arn,
-                "destination_secret_arn": destination_secret_arn,
+                "source_credentials": source_credentials,
+                "destination_credentials": destination_credentials,
                 "chunk_size": migration.chunk_size,
             }, invocation_type="Event")
         except Exception as exc:

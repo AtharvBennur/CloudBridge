@@ -262,7 +262,7 @@ export function AWSConnectionPage() {
             </div>
             <h1 className="text-3xl font-semibold tracking-tight">AWS IAM Onboarding</h1>
             <p className="mt-2 max-w-2xl text-sm text-muted-foreground">
-              Configure cross-account delegation roles. CloudBridge assumes this IAM role using your unique generated External ID to configure database secrets.
+              Configure cross-account delegation roles. CloudBridge assumes this IAM role using your unique generated External ID for Lambda migration execution.
             </p>
           </div>
         </div>

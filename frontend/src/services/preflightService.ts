@@ -18,6 +18,14 @@ export interface CheckDetail {
   details?: any;
 }
 
+export interface PreflightChecks {
+  sts: CheckDetail;
+  role_access: CheckDetail;
+  region: CheckDetail;
+  iam_permissions: CheckDetail;
+  database_connectivity: CheckDetail;
+}
+
 export interface PreflightReport {
   status: "READY" | "FAILED";
   summary: string;
@@ -28,14 +36,7 @@ export interface PreflightReport {
     region: string;
     status: string;
   };
-  checks: {
-    sts_assume_role: CheckDetail;
-    role_access: CheckDetail;
-    region: CheckDetail;
-    iam_permissions: CheckDetail;
-    secrets: CheckDetail;
-    database_connectivity: CheckDetail;
-  };
+  checks: PreflightChecks;
   database_status: {
     source: { ok: boolean; message: string };
     destination: { ok: boolean; message: string };

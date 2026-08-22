@@ -54,7 +54,7 @@ export function DatabaseConfigPage() {
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [formValues, setFormValues] = useState({
     name: "",
-    database_type: "POSTGRESQL",
+    database_type: "postgresql",
     host: "",
     port: 5432,
     username: "",
@@ -141,10 +141,7 @@ export function DatabaseConfigPage() {
       }
 
       if (formValues.purpose === "DESTINATION") {
-        if (formValues.dest_option === "A") {
-          if (formValues.secret_arn) payload.secret_arn = formValues.secret_arn;
-          if (formValues.secret_name) payload.secret_name = formValues.secret_name;
-        } else {
+        if (formValues.dest_option === "B") {
           payload.provisioning_config = formValues.provisioning_config;
         }
       }
@@ -165,8 +162,6 @@ export function DatabaseConfigPage() {
         username: "",
         password: "",
         database_name: "",
-        secret_name: "",
-        secret_arn: "",
       }));
       setTimeout(() => setSuccessMessage(null), 5000);
     },
@@ -285,17 +280,17 @@ export function DatabaseConfigPage() {
 
                 {/* AWS connection dropdown */}
                 <div className="space-y-2">
-                  <Label htmlFor="aws_connection_id">AWS Connection (for Secrets Manager)</Label>
+                  <Label htmlFor="aws_connection_id">AWS Connection</Label>
                   <select
                     id="aws_connection_id"
                     className="flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm shadow-sm"
                     value={formValues.aws_connection_id}
-                    onChange={(e) => setFormValues({ ...formValues, aws_connection_id: e.target.value })}
+                    onChange={(e) => updateField("aws_connection_id", e.target.value)}
                   >
-                    <option value="">-- Select AWS Connection --</option>
+                    <option value="">-- Optional --</option>
                     {awsConnectionsQuery.data?.map((conn) => (
                       <option key={conn.id} value={conn.id}>
-                        AWS Account: {conn.aws_account_id} ({conn.aws_region})
+                        Account {conn.aws_account_id} ({conn.aws_region})
                       </option>
                     ))}
                   </select>
@@ -499,13 +494,6 @@ export function DatabaseConfigPage() {
                 </div>
 
                 <div className="mt-3 space-y-2 border-t pt-3 text-xs text-muted-foreground">
-                  {config.secret_arn && (
-                    <div className="flex items-center gap-1.5">
-                      <KeyRound className="h-3.5 w-3.5 text-primary shrink-0" />
-                      <span className="font-medium text-foreground">Secret ARN:</span>
-                      <span className="truncate max-w-[240px]" title={config.secret_arn}>{config.secret_arn}</span>
-                    </div>
-                  )}
                   {config.aws_connection_id && (
                     <div>
                       <span className="font-medium text-foreground">AWS Conn ID:</span> {config.aws_connection_id}
